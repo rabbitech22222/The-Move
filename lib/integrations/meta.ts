@@ -223,7 +223,11 @@ export async function syncInstagramMetrics(
         channelId,
         date,
         followers,
-        followerDelta: previous ? followers - previous.followers : null,
+        followerDelta:
+          previous?.date ===
+          new Date(start - 86_400_000).toISOString().slice(0, 10)
+            ? followers - previous.followers
+            : null,
         views: values.views ?? null,
         reach: values.reach,
         engagements: values.total_interactions,

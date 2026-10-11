@@ -822,7 +822,21 @@ describe("Meta metric protocol remains separate from Korean display text", () =>
   it("requests the official views field for account and post metrics and stores the returned values", async () => {
     const data = fixture.data!;
     data.demo = false;
-    data.accountMetrics = [];
+    data.accountMetrics = [
+      {
+        id: "old-meta-observation",
+        channelId: "the-move",
+        date: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10),
+        followers: 450,
+        followerDelta: null,
+        views: null,
+        reach: null,
+        engagements: null,
+        postsPublished: null,
+        source: "META",
+        syncedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+      },
+    ];
     data.posts = [];
     data.postMetrics = [];
     data.channels[0].platformAccountId = "1784101";
@@ -875,9 +889,9 @@ describe("Meta metric protocol remains separate from Korean display text", () =>
     });
     const result = await syncInstagramMetrics("the-move", "operator-1");
     expect(result.unavailable).toEqual([]);
-    expect(data.accountMetrics[0].views).toBe(321);
+    expect(data.accountMetrics.at(-1)!.views).toBe(321);
     expect(data.postMetrics[0].views).toBe(777);
-    expect(data.accountMetrics[0].followerDelta).toBeNull();
+    expect(data.accountMetrics.at(-1)!.followerDelta).toBeNull();
     expect(
       calls.filter(
         (url) => new URL(url).searchParams.get("metric") === "views",
