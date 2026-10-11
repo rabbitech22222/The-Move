@@ -12,7 +12,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 process.chdir(root);
 const port = Number(process.env.MOVE_DEMO_PORT || 3000);
 const origin = `http://localhost:${port}`;
-const checkOnly = process.argv.includes("--check");
+const checkBrowser = process.argv.includes("--check-browser");
+const checkOnly = process.argv.includes("--check") || checkBrowser;
 let server;
 let setupChild;
 const runtime = path.join(root, ".move-runtime");
@@ -111,12 +112,13 @@ async function main() {
   });
   const data = (await workspace.json()).data;
   assert(workspace.ok && data?.demo && data.channels.length >= 3, "데모 작업 공간을 읽지 못했습니다.");
-  console.log("대시보드 화면을 확인합니다.");
-  const dashboard = await fetch(origin, {
-    headers: { Cookie: cookie }, signal: AbortSignal.timeout(30000),
-  });
-  const html = await dashboard.text();
-  assert(dashboard.ok && html.includes("Dashboard") && html.includes("DEMO MODE"), "대시보드 화면이 준비되지 않았습니다. 위 서버 오류를 확인하세요.");
+  console.log("로그인 화면을 확인합니다.");
+  const loginPage = await fetch(`${origin}/login`, { signal: AbortSignal.timeout(30000) });
+  assert(loginPage.ok && (await loginPage.text()).includes("Enter workspace"), "로그인 화면이 준비되지 않았습니다. 위 서버 오류를 확인하세요.");
+  if (checkBrowser) {
+    const { checkLocalBrowser } = await import("./check-local-browser.mjs");
+    await checkLocalBrowser(origin);
+  }
   console.log(`\nTHE MOVE OS 실행 완료: ${origin}`);
   console.log("로그인 화면에서 Enter workspace를 누르세요. 이메일과 데모 비밀번호가 미리 입력되어 있습니다.");
   console.log("이 창을 열어 둔 채 사용하세요. 종료하려면 Ctrl+C를 누르세요.\n");

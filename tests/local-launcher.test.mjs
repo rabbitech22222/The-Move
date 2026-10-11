@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, writeFile, readFile, rm, realpath } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { findNpmCli, runCheckedProcess } from "../scripts/local-process.mjs";
@@ -20,8 +20,13 @@ describe("local setup process supervision", () => {
     try {
       const cli = path.join(root, "node_modules/npm/bin/npm-cli.js");
       await mkdir(path.dirname(cli), { recursive: true });
-      await writeFile(cli, "// fixture");
-      expect(findNpmCli(path.join(root, "node.exe"), "", null)).toBe(await realpath(cli));
+      await writeFile(cli, 'console.log("fixture npm executed")');
+      let output = "";
+      await runCheckedProcess({
+        args: [findNpmCli(path.join(root, "node.exe"), "", null)],
+        label: "npm path check", output: text => { output += text; },
+      });
+      expect(output).toContain("fixture npm executed");
     } finally { await rm(root, { recursive: true, force: true }); }
   });
 
