@@ -10,6 +10,8 @@ Built with Next.js 16, React 19, TypeScript, Tailwind 4, shadcn-style Radix UI c
 
 For a browser-based local demo with automatic setup, run **START-WINDOWS.bat** on Windows or **START-MAC.command** on Mac. Node 24 or later is required. See [한국어 실행 안내](START-HERE.md). The launcher installs dependencies as needed, generates local keys and Prisma, verifies login and workspace access, then opens the browser. Docker and external API credentials are not required for this demo.
 
+Local setup calls npm directly through Node, reports elapsed time and downloads, and records `.move-runtime/setup.log`. It skips dependency lifecycle scripts and explicitly generates Prisma's JavaScript client, avoiding unused native-engine downloads while retaining npm integrity and TLS checks. Interrupted installations are retried; successful installations are reused for the same lockfile. A Windows CI job validates a fresh demo install and login in a directory with spaces.
+
 Requires Node.js 24 (see `.node-version`) and npm. No external API credentials are needed.
 
 ```sh

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findNpmCli, runCheckedProcess } from "./local-process.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 process.chdir(root);
@@ -12,22 +14,24 @@ const port = Number(process.env.MOVE_DEMO_PORT || 3000);
 const origin = `http://localhost:${port}`;
 const checkOnly = process.argv.includes("--check");
 let server;
+let setupChild;
+const runtime = path.join(root, ".move-runtime");
+const logFile = path.join(runtime, "setup.log");
+const installMarker = path.join(runtime, "dependencies.sha256");
 
-async function runNpm(args) {
-  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", args, {
-    cwd: root,
-    stdio: "inherit",
-    shell: process.platform === "win32",
+async function setupStep(label, args, timeoutMs = 120000) {
+  await runCheckedProcess({
+    args, cwd: root, label, logFile, timeoutMs,
     env: {
       ...process.env,
-      npm_config_cache: process.env.npm_config_cache || path.join(root, ".move-runtime", "npm-cache"),
+      npm_config_cache: process.env.npm_config_cache || path.join(runtime, "npm-cache"),
     },
+    onChild: child => { setupChild = child; },
   });
-  const [code] = await once(child, "exit");
-  if (code !== 0) throw new Error(`npm ${args.join(" ")} failed.`);
 }
 
 async function stop() {
+  if (setupChild && setupChild.exitCode === null) setupChild.kill("SIGTERM");
   if (!server || server.exitCode !== null) return;
   const stopped = once(server, "exit");
   server.kill("SIGTERM");
@@ -40,6 +44,8 @@ async function main() {
   assert(Number(process.versions.node.split(".")[0]) >= 24,
     "Node.js 24 이상을 설치한 다음 실행 파일을 다시 여세요: https://nodejs.org/en/download");
   assert(Number.isInteger(port) && port >= 1024 && port <= 65535, "MOVE_DEMO_PORT must be a valid port.");
+  mkdirSync(runtime, { recursive: true });
+  writeFileSync(logFile, `THE MOVE OS 로컬 실행 ${new Date().toISOString()}\nNode ${process.versions.node} / ${process.platform} ${process.arch}\n`, { mode: 0o600 });
   const probe = createServer();
   await new Promise((resolve, reject) => {
     probe.once("error", () => reject(new Error(`${port} 포트가 사용 중입니다. 기존 앱을 종료하고 다시 실행하세요.`)));
@@ -47,14 +53,25 @@ async function main() {
   });
   await new Promise(resolve => probe.close(resolve));
 
-  if (!existsSync(path.join(root, "node_modules/next/package.json"))) {
-    console.log("처음 실행에 필요한 패키지를 설치합니다. 잠시 기다려 주세요.");
-    await runNpm(["ci"]);
+  const npmCli = findNpmCli();
+  const lockHash = createHash("sha256").update(readFileSync(path.join(root, "package-lock.json"))).digest("hex");
+  const previousInstall = existsSync(installMarker) ? readFileSync(installMarker, "utf8").trim() : "";
+  const required = ["next/dist/bin/next", "prisma/build/index.js", "@prisma/client/package.json", "@prisma/adapter-pg/package.json", "dotenv/package.json"];
+  if (previousInstall !== lockHash || required.some(file => !existsSync(path.join(root, "node_modules", file)))) {
+    rmSync(installMarker, { force: true });
+    console.log("패키지를 설치합니다. 10초마다 실행 상태를 표시하며, 다운로드 로그를 아래에 출력합니다.");
+    // The demo explicitly generates the supported JS Prisma client below.
+    // Skipping lifecycle scripts avoids downloading unused native Prisma engines.
+    // npm still verifies package-lock integrity and HTTPS certificates.
+    await setupStep("[1/3] 패키지 설치", [npmCli, "ci", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=http", "--fetch-timeout=30000", "--fetch-retries=1", "--fetch-retry-mintimeout=1000", "--fetch-retry-maxtimeout=4000"], 600000);
+    writeFileSync(installMarker, lockHash, { mode: 0o600 });
+  } else {
+    console.log("[1/3] 검증된 패키지 설치를 재사용합니다.");
   }
-  await runNpm(["run", "setup:local"]);
+  await setupStep("[2/3] 로컬 설정 준비", [path.join(root, "scripts/setup-local.mjs")]);
   const { config } = await import("dotenv");
   config({ path: path.join(root, ".env"), quiet: true });
-  await runNpm(["run", "db:generate"]);
+  await setupStep("[3/3] 데이터 클라이언트 생성", [path.join(root, "node_modules/prisma/build/index.js"), "generate"]);
   assert(process.env.SESSION_SECRET?.length >= 32, "로컬 .env의 SESSION_SECRET 설정을 확인하세요.");
   const env = {
     ...process.env,

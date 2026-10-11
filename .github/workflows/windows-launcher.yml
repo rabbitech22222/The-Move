@@ -1,0 +1,49 @@
+name: Windows local launcher
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/windows-launcher.yml
+      - scripts/start-demo.mjs
+      - scripts/local-process.mjs
+      - scripts/setup-local.mjs
+      - START-WINDOWS.bat
+      - package.json
+      - package-lock.json
+      - prisma/**
+      - prisma.config.ts
+      - tests/local-launcher.test.mjs
+      - vitest.config.mts
+  pull_request:
+    paths:
+      - scripts/start-demo.mjs
+      - scripts/local-process.mjs
+      - START-WINDOWS.bat
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-demo:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Fresh installation, login and process checks in a path with spaces
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'THE MOVE OS test'
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          Get-ChildItem -Force | Where-Object { $_.Name -ne '.git' } | Copy-Item -Destination $target -Recurse
+          Set-Location $target
+          node scripts/start-demo.mjs --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test -- tests/local-launcher.test.mjs
+          exit $LASTEXITCODE
