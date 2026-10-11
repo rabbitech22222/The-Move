@@ -38,7 +38,10 @@ export async function GET() {
       instagram: {
         handle: "@themovemag_",
         verified:
-          !!channel?.connected && !!channel.platformAccountId && !meta.expired,
+          meta.configured &&
+          !!channel?.connected &&
+          !!channel.platformAccountId &&
+          !meta.expired,
         accountId: channel?.platformAccountId || null,
         lastSyncedAt: latestMetric?.syncedAt || null,
         syncStatus: latestSync?.status || null,
