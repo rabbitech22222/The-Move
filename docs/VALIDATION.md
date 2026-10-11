@@ -10,7 +10,7 @@ Node.js 24, PostgreSQL 17, Redis 7과 Chromium에서 실제 실행한 결과입�
 | Redis 작업 처리기 | 중복 정리와 주간 보고가 실제 QUEUED → RUNNING → SUCCEEDED 이벤트 및 결과를 저장 |
 | Docker 운영 환경 | 이미지 빌드와 독립 운영 앱 검증 통과. 두 운영자 로그인, 예시 지표가 없는 상태, 편집 내용·자료·감사 기록의 재시작 후 유지, 실제 작업 처리 완료 확인 |
 | 실제 운영 실행기 | Linux에서 새 `.env.live`와 독립 `the-move-live` 프로젝트로 실행. PostgreSQL·Redis·앱·작업 처리기 시작 후 실제 로그인, 비데모 상태 및 작업 완료 확인. Windows의 Docker Desktop 실행은 아직 별도 검증하지 않음 |
-| Windows 데모 실행기 | 이전 버전의 새 설치·공백 포함 경로·로그인·브라우저 검증은 GitHub Actions에서 통과. 이번 한국어 버전의 Windows 결과는 아래에 별도로 기록 예정 |
+| Windows 데모 실행기 | 최신 한국어 버전의 새 설치·공백 포함 경로·로그인·Chromium 화면 검증 및 실행기 테스트 통과. [실제 Windows 실행 기록](https://github.com/rabbitech22222/The-Move/actions/runs/38134180705), 검증한 소스 `0e28b6df462251012857fda8dc8088761c09a30f` |
 | 타입·빌드 | 타입 검사와 Next.js 프로덕션 빌드 통과 |
 
 실제 Canva·Meta 인증 정보가 이 환경에 제공되지 않았습니다. **원본 디자인의 실제 모습·필드 검사, 인증된 Canva 생성·내보내기, @themovemag_ 지표 조회·실제 게시의 외부 서비스 종단 검증은 미완료**입니다. API 응답을 대체한 테스트는 해당 서비스의 성공을 증명하지 않습니다. 실제 계정의 권한, 앱 검토, Autofill 이용 자격, 미디어 적합성도 인증 후 확인해야 합니다.
