@@ -102,6 +102,13 @@ export interface CanvaTemplate {
   designId: string;
   width: number;
   height: number;
+  configuration?: {
+    brandTemplateId?: string;
+    pageCount?: number;
+    fieldTypes?: Record<string, string>;
+    previewUrl?: string;
+    sourceTitle?: string;
+  };
   inspectedAt: string | null;
   fields: string[];
   status: "UNINSPECTED" | "READY" | "SETUP_REQUIRED";
@@ -113,6 +120,8 @@ export interface GeneratedDesign {
   templateId: string;
   status: "QUEUED" | "READY" | "FAILED" | "SETUP_REQUIRED" | "MANUAL_REVIEW";
   editUrl: string | null;
+  exportJobId?: string;
+  exportUrls?: string[];
   externalId: string | null;
   error: string | null;
   createdAt: string;
@@ -152,6 +161,7 @@ export interface ScheduledPublication {
   status: "SCHEDULED" | "RUNNING" | "PUBLISHED" | "FAILED" | "CANCELLED";
   platformPostId: string | null;
   error: string | null;
+  mediaUrls?: string[];
   mediaUrl: string;
   caption: string;
 }

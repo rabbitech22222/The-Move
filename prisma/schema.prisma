@@ -362,6 +362,7 @@ model CanvaTemplate {
   designId    String
   width       Int
   height      Int
+  configuration Json?
   inspectedAt DateTime?
   fields      String[]
   status      TemplateStatus @default(UNINSPECTED)
@@ -381,6 +382,8 @@ model GeneratedDesign {
   template    CanvaTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
   status      DesignStatus
   editUrl     String?
+  exportJobId String?
+  exportUrls  String[] @default([])
   externalId  String?
   error       String?
   createdAt   DateTime @default(now())
@@ -442,6 +445,7 @@ model ScheduledPublication {
   status         PublicationStatus @default(SCHEDULED)
   platformPostId String?
   error          String?
+  mediaUrls      String[] @default([])
   mediaUrl       String
   caption        String
   @@index([workspaceId, status, scheduledAt])

@@ -1,3 +1,4 @@
+import { koreanLabel } from "../korean";
 import { getWorkspaceData, mutateWorkspace } from "../data";
 import type { Project, Recommendation, WorkspaceData } from "../domain";
 
@@ -166,14 +167,14 @@ export async function weeklyRecommendations(
   );
   const week = weekStart.toISOString().slice(0, 10);
   const label = summary.isDemo
-    ? "DEMO DATA — illustrative recommendation only. "
-    : "Stored authorized account data. ";
+    ? "예시 데이터 — 실제 성과를 뒷받침하지 않는 제안입니다. "
+    : "저장된 인증 계정 데이터입니다. ";
   const candidates: Recommendation[] = [];
   function propose(key: string, title: string, rationale: string) {
     candidates.push({
       id: `weekly-${week}-${key}`,
       title,
-      rationale: `${label}${rationale} This is an observational proposal, not a causal conclusion. Human approval is required before changing any rule or running an experiment.`,
+      rationale: `${label}${rationale} 관찰에 따른 제안이며 원인을 단정하지 않습니다. 실험 실행이나 규칙 변경에는 사람의 승인이 필요합니다.`,
       status: "PROPOSED",
       createdAt: now.toISOString(),
       experimentResult: null,
@@ -190,14 +191,14 @@ export async function weeklyRecommendations(
       const other = formats.at(-1)!;
       propose(
         `${channel.channelId}-format`,
-        `${channel.name}: test ${best.key.toLowerCase()} against ${other.key.toLowerCase()}`,
-        `Latest available post snapshots show median engagement/reach of ${(best.medianEngagementRate! * 100).toFixed(2)}% for ${best.key} (n=${best.sampleSize}) and ${(other.medianEngagementRate! * 100).toFixed(2)}% for ${other.key} (n=${other.sampleSize}). Compare matched topics and equal observation windows before adopting a format preference.`,
+        `${channel.name}: ${koreanLabel(best.key)}와 ${koreanLabel(other.key)} 비교 실험`,
+        `최신 기록의 도달 대비 반응 중앙값은 ${koreanLabel(best.key)} ${(best.medianEngagementRate! * 100).toFixed(2)}% (표본 ${best.sampleSize}개), ${koreanLabel(other.key)} ${(other.medianEngagementRate! * 100).toFixed(2)}% (표본 ${other.sampleSize}개)입니다. 형식을 선택하기 전 같은 주제와 관찰 기간으로 비교하세요.`,
       );
     } else {
       propose(
         `${channel.channelId}-evidence`,
-        `${channel.name}: collect comparable post evidence`,
-        `Format comparisons require at least three posts with complete reach and interaction metrics in each compared format. Currently available: ${channel.formats.map((group) => `${group.key} n=${group.sampleSize}`).join(", ") || "no complete post metrics"}. Synchronize authorized metrics and record post age before drawing conclusions.`,
+        `${channel.name}: 비교 가능한 게시물 근거 수집`,
+        `형식 비교에는 각 형식별 도달과 반응 지표가 완전한 게시물 3개 이상이 필요합니다. 현재 표본: ${channel.formats.map((group) => `${koreanLabel(group.key)} ${group.sampleSize}개`).join(", ") || "완전한 지표 없음"}. 인증된 지표를 동기화하고 게시 후 경과 시간을 기록하세요.`,
       );
     }
     if (
@@ -206,8 +207,8 @@ export async function weeklyRecommendations(
     ) {
       propose(
         `${channel.channelId}-production`,
-        `${channel.name}: document a production experiment`,
-        `${channel.timedProjectCount} published projects have manually recorded production time; median ${channel.medianProductionMinutes.toFixed(0)} minutes. Propose one workflow change and record quality, time and operator feedback; this does not measure employee activity or demonstrate a productivity cause.`,
+        `${channel.name}: 제작 과정 실험 기록`,
+        `게시 완료 프로젝트 ${channel.timedProjectCount}개에 제작 시간이 기록되어 있으며 중앙값은 ${channel.medianProductionMinutes.toFixed(0)}분입니다. 제작 과정 변경 하나를 제안하고 품질, 시간과 운영자 의견을 기록하세요. 이는 직원 활동 측정이나 생산성 원인 증명이 아닙니다.`,
       );
     }
   }

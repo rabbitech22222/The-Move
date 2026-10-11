@@ -9,12 +9,19 @@ on:
       - scripts/local-process.mjs
       - scripts/check-local-browser.mjs
       - scripts/setup-local.mjs
+      - scripts/prepare-live.mjs
+      - scripts/start-live.mjs
+      - app/**
+      - components/**
+      - lib/**
       - START-WINDOWS.bat
+      - START-LIVE-WINDOWS.bat
       - package.json
       - package-lock.json
       - prisma/**
       - prisma.config.ts
       - tests/local-launcher.test.mjs
+      - tests/live-launcher.test.mjs
       - vitest.config.mts
   pull_request:
     paths:
@@ -41,7 +48,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '24'
+          node-version: "24"
       - name: Fresh installation, login and process checks in a path with spaces
         shell: pwsh
         run: |
@@ -51,5 +58,5 @@ jobs:
           Set-Location $target
           node scripts/start-demo.mjs --check-browser
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm test -- tests/local-launcher.test.mjs
+          npm test -- tests/local-launcher.test.mjs tests/live-launcher.test.mjs
           exit $LASTEXITCODE

@@ -75,7 +75,7 @@ describe("manual Canva alternative", () => {
       actor,
     );
     expect(design.status).toBe("MANUAL_REVIEW");
-    expect(design.error).toContain("not verified");
+    expect(design.error).toContain("확인되지 않았습니다");
     expect(design.editUrl).not.toContain("utm_source");
     workspace = await getWorkspaceData();
     expect(workspace.projects.find((p) => p.id === project.id)?.stage).toBe(

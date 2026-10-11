@@ -1,4 +1,5 @@
 "use client";
+import { koreanLabel } from "@/lib/korean";
 
 import { useMemo, useState } from "react";
 import {
@@ -30,13 +31,13 @@ import type { Topic } from "@/lib/domain";
 
 function date(value: string | null) {
   return value
-    ? new Date(value).toLocaleDateString("en-US", {
+    ? new Date(value).toLocaleDateString("ko-KR", {
         month: "short",
         day: "numeric",
         year: "numeric",
         timeZone: "Asia/Seoul",
       })
-    : "Not provided";
+    : "미제공";
 }
 
 export function Intelligence() {
@@ -82,9 +83,7 @@ export function Intelligence() {
     } catch (err) {
       setNotice({
         text:
-          err instanceof Error
-            ? err.message
-            : "The action could not be completed.",
+          err instanceof Error ? err.message : "작업을 완료하지 못했습니다.",
         failed: true,
       });
       return false;
@@ -97,7 +96,7 @@ export function Intelligence() {
     const sources = data?.sources.filter((source) => source.enabled) || [];
     if (!sources.length) {
       setNotice({
-        text: "Add an authorized source before fetching. Demo fixture sources are disabled.",
+        text: "수집 전 접근 권한이 있는 출처를 추가하세요. 데모 출처는 수집이 꺼져 있습니다.",
         failed: true,
       });
       return;
@@ -114,12 +113,12 @@ export function Intelligence() {
         queued++;
       }
       setNotice({
-        text: `${queued} source ingestion job(s) queued. Check the Scout task in the Office, then refresh the inbox.`,
+        text: `출처 수집 ${queued}건을 대기열에 추가했습니다. 오피스의 발견 담당 작업을 확인한 뒤 수신함을 새로고침하세요.`,
         failed: false,
       });
     } catch (err) {
       setNotice({
-        text: `${queued ? `${queued} source job(s) queued. ` : ""}${err instanceof Error ? err.message : "Source ingestion could not be queued."}`,
+        text: `${queued ? `출처 수집 ${queued}건을 대기열에 추가했습니다. ` : ""}${err instanceof Error ? err.message : "출처 수집을 대기열에 추가하지 못했습니다."}`,
         failed: true,
       });
     } finally {
@@ -133,23 +132,23 @@ export function Intelligence() {
     <div className="space-y-6">
       <header className="page-header">
         <div>
-          <p className="eyebrow">DISCOVER / RESEARCH / EVALUATE</p>
-          <h1 className="page-title">Intelligence</h1>
+          <p className="eyebrow">발견 / 조사 / 평가</p>
+          <h1 className="page-title">정보 수집</h1>
           <p className="muted mt-2">
-            A considered starting point for your next story. Every claim starts
-            with a source.
+            다음 콘텐츠를 위한 정보 수집 공간입니다. 모든 주장은 출처에서
+            시작합니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => void refresh()}>
-            Refresh inbox
+            수신함 새로고침
           </Button>
           <Button variant="outline" onClick={() => setSourceOpen(true)}>
-            <Plus size={15} /> Add source
+            <Plus size={15} /> 출처 추가
           </Button>
           <Button onClick={fetchSources} disabled={!!busy}>
             <Radio size={15} />
-            {busy === "ingest" ? "Queuing…" : "Fetch sources"}
+            {busy === "ingest" ? "대기열에 등록 중…" : "출처 수집"}
           </Button>
         </div>
       </header>
@@ -163,19 +162,19 @@ export function Intelligence() {
       )}
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat
-          label="IN THE INBOX"
+          label="수신함"
           value={data.topics.filter((t) => t.status === "INBOX").length}
-          description="Stories waiting for your judgment"
+          description="검토를 기다리는 주제"
         />
         <Stat
-          label="SAVED FOR LATER"
+          label="저장한 주제"
           value={data.topics.filter((t) => t.status === "SAVED").length}
-          description="Keep promising angles within reach"
+          description="유망한 주제를 저장하세요"
         />
         <Stat
-          label="ACTIVE SOURCES"
+          label="활성 출처"
           value={data.sources.filter((s) => s.enabled).length}
-          description="Authorized RSS feeds and submissions"
+          description="접근 권한이 있는 RSS와 제출 자료"
         />
       </div>
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -183,14 +182,13 @@ export function Intelligence() {
           <div className="panel-header flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-semibold">
-                The inbox{" "}
+                정보 수신함{" "}
                 <span className="ml-2 text-xs font-normal muted">
-                  {topics.length} stories
+                  {topics.length} 개 주제
                 </span>
               </h2>
               <p className="muted mt-1 text-xs">
-                Relevance is a transparent heuristic, never a prediction of
-                virality.
+                관련도는 설명 가능한 규칙 점수이며 유행 확률 예측이 아닙니다.
               </p>
             </div>
             <div className="flex gap-1">
@@ -199,45 +197,45 @@ export function Intelligence() {
                 size="sm"
                 onClick={() => setStatus("INBOX")}
               >
-                Inbox
+                수신함
               </Button>
               <Button
                 variant={status === "SAVED" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setStatus("SAVED")}
               >
-                Saved
+                저장됨
               </Button>
               <Button
                 variant={status === "all" ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => setStatus("all")}
               >
-                All
+                전체
               </Button>
             </div>
           </div>
           <div className="flex flex-wrap gap-3 border-b border-[var(--border)] p-4">
             <label className="relative min-w-[180px] flex-1">
-              <span className="sr-only">Search intelligence topics</span>
+              <span className="sr-only">정보 주제 검색</span>
               <Search
                 size={15}
                 className="absolute left-3 top-3 text-[var(--muted-text)]"
               />
               <input
                 className="input w-full !pl-9"
-                placeholder="Find a story or category…"
+                placeholder="주제 또는 분류 검색…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </label>
             <select
               className="select !w-auto"
-              aria-label="Filter recommended channel"
+              aria-label="추천 채널 필터"
               value={channel}
               onChange={(e) => setChannel(e.target.value)}
             >
-              <option value="all">All channels</option>
+              <option value="all">전체 채널</option>
               {data.channels.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -249,12 +247,12 @@ export function Intelligence() {
             <table className="data-table w-full">
               <thead>
                 <tr>
-                  <th className="text-left">Story & source</th>
-                  <th className="text-left">Channel</th>
-                  <th className="text-left">Relevance</th>
-                  <th className="text-left">Evidence</th>
+                  <th className="text-left">주제 및 출처</th>
+                  <th className="text-left">채널</th>
+                  <th className="text-left">관련도</th>
+                  <th className="text-left">근거</th>
                   <th>
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">작업</span>
                   </th>
                 </tr>
               </thead>
@@ -271,31 +269,29 @@ export function Intelligence() {
                       <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs muted">
                         <span>
                           {data.sources.find((s) => s.id === topic.sourceId)
-                            ?.name ?? "Submitted source"}
+                            ?.name ?? "제출 출처"}
                         </span>
                         <span aria-hidden="true">·</span>
                         <span>{date(topic.publishedAt)}</span>
                       </p>
                       <div className="mt-2 flex gap-2">
-                        <Badge>{topic.category}</Badge>
+                        <Badge>{koreanLabel(topic.category)}</Badge>
                         <Badge>
-                          {topic.format === "REEL" ? "Reel" : "Carousel"}
+                          {topic.format === "REEL" ? "릴스" : "캐러셀"}
                         </Badge>
-                        {topic.status === "DISMISSED" && (
-                          <Badge>Dismissed</Badge>
-                        )}
+                        {topic.status === "DISMISSED" && <Badge>제외됨</Badge>}
                       </div>
                     </td>
                     <td className="text-xs whitespace-nowrap">
                       {data.channels.find(
                         (c) => c.id === topic.recommendedChannelId,
-                      )?.name ?? "Unassigned"}
+                      )?.name ?? "미지정"}
                     </td>
                     <td>
                       <button
                         className="text-left"
                         onClick={() => setSelected(topic)}
-                        aria-label={`Explain relevance score of ${topic.relevance} for ${topic.title}`}
+                        aria-label={`${topic.title}의 관련도 점수 ${topic.relevance}점 근거 보기`}
                       >
                         <span className="font-semibold tabular-nums">
                           {topic.relevance}
@@ -324,11 +320,11 @@ export function Intelligence() {
                               : ""
                         }
                       >
-                        {topic.confidence.toLowerCase()}
+                        {koreanLabel(topic.confidence)}
                       </Badge>
                       {topic.uncertainClaims.length > 0 && (
                         <p className="mt-2 text-[11px] muted">
-                          {topic.uncertainClaims.length} uncertain claim
+                          {topic.uncertainClaims.length} 개 불확실한 주장
                           {topic.uncertainClaims.length === 1 ? "" : "s"}
                         </p>
                       )}
@@ -338,7 +334,7 @@ export function Intelligence() {
                         variant="ghost"
                         size="icon"
                         onClick={() => setSelected(topic)}
-                        aria-label={`Review ${topic.title}`}
+                        aria-label={`${topic.title} 검토`}
                       >
                         <ChevronDown size={16} />
                       </Button>
@@ -353,9 +349,9 @@ export function Intelligence() {
                   className="mx-auto mb-3 text-[var(--muted-text)]"
                   size={28}
                 />
-                <p className="font-medium">No stories in this view</p>
+                <p className="font-medium">표시할 주제 없음</p>
                 <p className="mt-1 text-sm muted">
-                  Adjust your filters or add an authorized source.
+                  필터를 변경하거나 접근 권한이 있는 출처를 추가하세요.
                 </p>
               </div>
             )}
@@ -364,7 +360,7 @@ export function Intelligence() {
         <aside className="space-y-4">
           <section className="panel">
             <div className="panel-header">
-              <h2 className="text-sm font-semibold">Your source desk</h2>
+              <h2 className="text-sm font-semibold">출처 목록</h2>
             </div>
             <div className="divide-y divide-[var(--border)]">
               {data.sources.map((source) => (
@@ -383,8 +379,8 @@ export function Intelligence() {
                   </div>
                   <p className="mt-2 text-xs muted">
                     {source.lastFetchedAt
-                      ? `Fetched ${date(source.lastFetchedAt)}`
-                      : "Not fetched yet"}
+                      ? `수집일 ${date(source.lastFetchedAt)}`
+                      : "아직 수집 전"}
                   </p>
                   {source.lastError && (
                     <p className="mt-2 text-xs text-red-600">
@@ -392,24 +388,23 @@ export function Intelligence() {
                     </p>
                   )}
                   <p className="mt-2 line-clamp-2 text-[11px] muted">
-                    {source.rights || "Usage rights require review"}
+                    {source.rights || "이용 권한 확인 필요"}
                   </p>
                 </div>
               ))}
               {data.sources.length === 0 && (
                 <p className="p-4 text-sm muted">
-                  No sources yet. Add a feed to begin.
+                  아직 출처가 없습니다. 피드를 추가하세요.
                 </p>
               )}
             </div>
           </section>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--accent-soft)] p-4">
             <Sparkles size={17} className="mb-3 text-[var(--accent)]" />
-            <h3 className="text-sm font-semibold">Evidence before instinct</h3>
+            <h3 className="text-sm font-semibold">근거를 먼저 확인하세요</h3>
             <p className="mt-2 text-xs leading-relaxed muted">
-              Inspect source dates, usage rights and uncertain claims before
-              turning a topic into a project. AI suggestions remain subject to
-              human review.
+              프로젝트를 만들기 전 출처 날짜, 이용 권한과 불확실한 주장을
+              확인하세요. AI 제안도 사람의 검토가 필요합니다.
             </p>
           </div>
         </aside>
@@ -423,41 +418,39 @@ export function Intelligence() {
         <DialogContent>
           {selected && (
             <>
-              <p className="eyebrow mb-2">STORY BRIEF</p>
+              <p className="eyebrow mb-2">주제 요약</p>
               <DialogTitle className="pr-6 text-xl font-semibold leading-snug">
                 {selected.title}
               </DialogTitle>
               <DialogDescription className="mt-2 text-sm muted">
-                Review the evidence and choose the next editorial step.
+                근거를 확인하고 다음 편집 작업을 선택하세요.
               </DialogDescription>
               <div className="mt-5 flex flex-wrap gap-2">
-                <Badge>{selected.category}</Badge>
-                <Badge>
-                  {selected.confidence.toLowerCase()} evidence confidence
-                </Badge>
-                <Badge>{selected.status.toLowerCase()}</Badge>
+                <Badge>{koreanLabel(selected.category)}</Badge>
+                <Badge>{koreanLabel(selected.confidence)} 근거 신뢰 수준</Badge>
+                <Badge>{koreanLabel(selected.status)}</Badge>
               </div>
               <dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="text-xs muted">Source</dt>
+                  <dt className="text-xs muted">출처</dt>
                   <dd className="mt-1">
-                    {selectedSource?.name || "Submitted source"}
+                    {selectedSource?.name || "제출 출처"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs muted">Published</dt>
+                  <dt className="text-xs muted">게시 완료</dt>
                   <dd className="mt-1">{date(selected.publishedAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs muted">Retrieved</dt>
+                  <dt className="text-xs muted">수집일</dt>
                   <dd className="mt-1">{date(selected.retrievedAt)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs muted">Recommended channel</dt>
+                  <dt className="text-xs muted">추천 채널</dt>
                   <dd className="mt-1">
                     {data.channels.find(
                       (c) => c.id === selected.recommendedChannelId,
-                    )?.name || "Unassigned"}
+                    )?.name || "미지정"}
                   </dd>
                 </div>
               </dl>
@@ -467,21 +460,21 @@ export function Intelligence() {
                 rel="noopener noreferrer"
                 className="mt-4 inline-flex items-center gap-2 text-sm text-[var(--accent)] hover:underline"
               >
-                Read original source <ExternalLink size={13} />
+                원문 보기 <ExternalLink size={13} />
               </a>
               <section className="mt-5 rounded-lg bg-[var(--muted)] p-4">
                 <h3 className="text-sm font-medium">
-                  Why this scores {selected.relevance} / 100
+                  점수 산정 근거 {selected.relevance} / 100
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed muted">
                   {selected.scoreExplanation}
                 </p>
               </section>
               <section className="mt-4">
-                <h3 className="text-sm font-medium">Rights & verification</h3>
+                <h3 className="text-sm font-medium">권한 및 검증</h3>
                 <p className="mt-2 text-sm muted">
                   {selected.rights ||
-                    "Usage rights have not been verified. Review before reuse."}
+                    "이용 권한을 확인하지 못했습니다. 재사용 전에 검토하세요."}
                 </p>
                 {selected.uncertainClaims.length ? (
                   <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-amber-700 dark:text-amber-400">
@@ -491,8 +484,8 @@ export function Intelligence() {
                   </ul>
                 ) : (
                   <p className="mt-2 text-xs muted">
-                    No uncertain claims have been flagged. Human verification is
-                    still required.
+                    표시된 불확실한 주장은 없습니다. 그래도 사람이 검증해야
+                    합니다.
                   </p>
                 )}
               </section>
@@ -515,11 +508,11 @@ export function Intelligence() {
                         topicId: selected.id,
                         format: "CAROUSEL",
                       },
-                      "Carousel project created in the Studio.",
+                      "스튜디오에 캐러셀 프로젝트를 만들었습니다.",
                     )
                   }
                 >
-                  <Plus size={14} /> Create carousel
+                  <Plus size={14} /> 캐러셀 만들기
                 </Button>
                 <Button
                   variant="outline"
@@ -532,11 +525,11 @@ export function Intelligence() {
                         topicId: selected.id,
                         format: "REEL",
                       },
-                      "Reel project created in the Studio.",
+                      "스튜디오에 릴스 프로젝트를 만들었습니다.",
                     )
                   }
                 >
-                  Create reel
+                  릴스 만들기
                 </Button>
                 <Button
                   variant="outline"
@@ -545,11 +538,11 @@ export function Intelligence() {
                     action(
                       selected.id,
                       { action: "research", topicId: selected.id },
-                      "Research task queued. Check the Office for its result.",
+                      "조사 작업을 대기열에 추가했습니다. 오피스에서 결과를 확인하세요.",
                     )
                   }
                 >
-                  <Search size={14} /> Research further
+                  <Search size={14} /> 추가 조사
                 </Button>
                 <Button
                   variant="ghost"
@@ -559,13 +552,13 @@ export function Intelligence() {
                       await action(
                         selected.id,
                         { action: "save", topicId: selected.id },
-                        "Story saved.",
+                        "주제를 저장했습니다.",
                       )
                     )
                       setSelected(null);
                   }}
                 >
-                  <Bookmark size={14} /> Save
+                  <Bookmark size={14} /> 저장
                 </Button>
                 <Button
                   variant="ghost"
@@ -575,13 +568,13 @@ export function Intelligence() {
                       await action(
                         selected.id,
                         { action: "dismiss", topicId: selected.id },
-                        "Story dismissed.",
+                        "주제를 제외했습니다.",
                       )
                     )
                       setSelected(null);
                   }}
                 >
-                  <X size={14} /> Dismiss
+                  <X size={14} /> 제외
                 </Button>
               </div>
             </>
@@ -590,12 +583,10 @@ export function Intelligence() {
       </Dialog>
       <Dialog open={sourceOpen} onOpenChange={setSourceOpen}>
         <DialogContent>
-          <DialogTitle className="text-xl font-semibold">
-            Add a source
-          </DialogTitle>
+          <DialogTitle className="text-xl font-semibold">출처 추가</DialogTitle>
           <DialogDescription className="mt-2 text-sm muted">
-            Use an RSS feed or a source URL you are authorized to access. Source
-            credit does not replace permission to reuse content.
+            접근 권한이 있는 RSS 또는 출처 URL을 사용하세요. 출처 표기만으로
+            콘텐츠 재사용 권한을 얻지는 않습니다.
           </DialogDescription>
           <form
             className="mt-6 space-y-4"
@@ -618,7 +609,7 @@ export function Intelligence() {
                 setSourceUrl("");
                 setRights("");
                 setNotice({
-                  text: "Source added. Fetch sources to retrieve its stories.",
+                  text: "출처를 추가했습니다. 출처 수집을 실행하세요.",
                   failed: false,
                 });
               } catch (err) {
@@ -626,7 +617,7 @@ export function Intelligence() {
                   text:
                     err instanceof Error
                       ? err.message
-                      : "Could not add source.",
+                      : "출처를 추가하지 못했습니다.",
                   failed: true,
                 });
               } finally {
@@ -635,7 +626,7 @@ export function Intelligence() {
             }}
           >
             <label className="block">
-              <span className="field-label">Source type</span>
+              <span className="field-label">출처 유형</span>
               <select
                 className="select mt-1 w-full"
                 value={sourceType}
@@ -643,24 +634,24 @@ export function Intelligence() {
                   setSourceType(e.target.value as "RSS" | "MANUAL")
                 }
               >
-                <option value="RSS">RSS feed</option>
-                <option value="MANUAL">User-submitted source</option>
+                <option value="RSS">RSS 피드</option>
+                <option value="MANUAL">직접 제출한 출처</option>
               </select>
             </label>
             <label className="block">
-              <span className="field-label">Source name</span>
+              <span className="field-label">출처 이름</span>
               <input
                 className="input mt-1 w-full"
                 required
                 maxLength={120}
-                placeholder="Publication or organization"
+                placeholder="매체 또는 기관"
                 value={sourceName}
                 onChange={(e) => setSourceName(e.target.value)}
               />
             </label>
             <label className="block">
               <span className="field-label">
-                {sourceType === "RSS" ? "RSS feed URL" : "Source URL"}
+                {sourceType === "RSS" ? "RSS 피드 주소" : "출처 주소"}
               </span>
               <input
                 className="input mt-1 w-full"
@@ -672,12 +663,12 @@ export function Intelligence() {
               />
             </label>
             <label className="block">
-              <span className="field-label">Rights & permitted use</span>
+              <span className="field-label">이용 권한 및 허용 범위</span>
               <textarea
                 className="input mt-1 min-h-24 w-full"
                 required
                 maxLength={2000}
-                placeholder="Record access terms and restrictions. If unknown, say so."
+                placeholder="접근 조건과 제한을 기록하세요. 모르면 미확인으로 작성하세요."
                 value={rights}
                 onChange={(e) => setRights(e.target.value)}
               />
@@ -689,7 +680,7 @@ export function Intelligence() {
             )}
             <Button type="submit" disabled={!!busy}>
               <Check size={14} />
-              {busy === "source" ? "Adding…" : "Add source"}
+              {busy === "source" ? "추가 중…" : "출처 추가"}
             </Button>
           </form>
         </DialogContent>

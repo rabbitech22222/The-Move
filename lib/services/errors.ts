@@ -1,3 +1,4 @@
+import { koreanError } from "../korean";
 export class ServiceError extends Error {
   constructor(
     public readonly code: string,
@@ -11,6 +12,9 @@ export class ServiceError extends Error {
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error
-    ? error.message
-    : "An unexpected operation failed.";
+    ? koreanError(
+        "code" in error ? String(error.code) : "INTERNAL_ERROR",
+        error.message,
+      )
+    : "예상하지 못한 오류가 발생했습니다.";
 }

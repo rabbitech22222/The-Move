@@ -1,39 +1,60 @@
-# Setup and operations
+# 설치 및 운영
 
-Use the existing isolated checkout. A Codex cloud task already has an isolated environment; do not create worktrees unless explicitly requested.
+내 컴퓨터 실행은 [처음 실행 안내](../START-HERE.md), 실제 인증·게시 설정은 [실제 운영 안내](REAL_PUBLISH_KO.md)를 참조하세요.
 
-## Environment
+## 환경과 설치
 
-Node 24, npm and Docker Compose are required for the full development stack. The labeled JSON demo works without PostgreSQL. Every mutation requires login and a same-origin request. `.env.example` lists variable names; `.env` and `.move-data` are ignored and must never be committed.
+Node.js 24, npm을 사용합니다. 전체 개발 환경과 실제 운영 실행기에는 Docker Desktop 또는 Docker Compose가 필요합니다. 기존 격리 체크아웃을 사용하며 요청 없이 별도 Git 작업 트리를 만들지 않습니다.
 
-`npm run setup:local` creates `.env` only if absent, generating fresh random session and encryption keys; it never overwrites an existing user configuration. `APP_URL` must match the actual app origin. HTTPS origins produce secure session/OAuth cookies. Sessions expire after 12 hours. Two non-demo passwords are required before database seeding. Do not reuse demo credentials in a live workspace.
+```sh
+npm ci
+npm run setup:local
+npm run db:generate
+npm run dev
+```
 
-## Repeatable installation and start
+setup:local은 기존 `.env`를 보존하고 새 파일에 임의 세션·암호화 키를 생성합니다. `.env*`, `.move-data`, `.move-runtime`은 버전 관리에서 제외됩니다. 모든 변경 요청에는 로그인과 APP_URL과 일치하는 Origin이 필요합니다. 세션은 12시간 후 만료되며 HTTPS 환경에서는 보안 쿠키를 사용합니다.
 
-Run `npm ci`, `npm run db:generate`, and `npm run setup:local` from the checkout (setup before generate if DATABASE_URL is not otherwise set). For the demo start `npm run dev`; for configured Redis actions start `docker compose up -d postgres redis` and `npm run worker`. For PostgreSQL mode set up operator passwords, run `npm run db:migrate` and `npm run db:seed` before starting app/worker. To serve a production bundle run `npm run build` and `npm run start`.
+Windows 데모 실행기는 npm-cli.js를 Node로 직접 실행해 shell=true 경고를 피합니다. 패키지 설치는 진행 로그와 10초마다 경과 시간을 표시합니다. 설치 중단 시 완료 기록을 남기지 않아 재시도하며, 성공한 동일 잠금 파일의 설치는 재사용합니다. 의존성 라이프사이클 스크립트 대신 Prisma JavaScript 클라이언트를 명시적으로 생성합니다. TLS 및 패키지 무결성 확인은 유지합니다.
 
-Readiness: request `/api/health`, sign in, request `/api/workspace`, open Dashboard/Studio/Office, and perform a sourced project edit or an actual deduplication job. A PID or open port alone is not readiness. `npm run test:e2e` covers the demo. `npm run test:db` must target a disposable migrated/seeded database; it briefly creates and removes projects and checks migration rollback/idempotency, retaining audit history.
+## 실제 운영
 
-## Migrations
+START-LIVE-WINDOWS.bat 또는 START-LIVE-MAC.command는 `.env.live`를 만들고 `the-move-live` 프로젝트로 전체 서비스를 실행합니다. 다른 임의 운영자 비밀번호와 데이터베이스 비밀번호를 생성합니다. 기존 파일·데이터·계정 비밀번호는 덮어쓰지 않습니다. 로그인 후 실제 계정은 설정에서 별도로 인증합니다. GPT 플러그인의 인증은 앱에 자동 전달되지 않습니다.
 
-`npm run db:migrate` uses the checked-in SQL and PostgreSQL directly, maintaining checksum-protected `_prisma_migrations` records. Historical migrations cannot change after application. Transactions roll back failed migrations. `prisma/schema.prisma` remains the source schema. Future schema changes should generate a new migration using `npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --script` with appropriate shadow database configuration, or review a generated diff against a known schema snapshot. Do not use `db push` as a substitute for the deploy ledger or alter old migration checksums. Prisma native CLI migration commands are not the cloud-tested path for this version.
+직접 개발 실행 시 `.env`에 DEMO_MODE=false, 서로 다른 12자 이상 운영자 비밀번호를 설정한 뒤 다음 명령을 사용합니다.
 
-## Queues and scheduling
+```sh
+docker compose up -d postgres redis
+npm run db:migrate
+npm run db:seed
+npm run dev
+# 별도 터미널
+npm run worker
+```
 
-BullMQ stores queue state in Redis, while database/JSON stores tasks and audit events. The worker concurrency is 2 and provider work is rate limited. Recurring schedules use Asia/Seoul. Demo recurrence enables only real dedup and observational weekly analysis. A disconnected provider fails explicitly; credentials do not establish an integration succeeded. Application start does not execute Instagram publishing without an approved future schedule.
+실제 공간에는 예시 지표나 게시 결과가 생성되지 않습니다. 같은 Redis 대기열에 데모 앱과 실제 작업 처리기를 혼합하지 않습니다. 데이터베이스 모드가 다르면 별도 Redis와 저장소를 사용합니다.
 
-Keep app/worker in the same persistence mode and workspace. Do not start a demo worker alongside a live app sharing the same Redis queue. A separate Redis database/URL is required for each isolated environment. Restart only processes you own. Cancel a scheduled publication through Studio; provider work already running cannot be cancelled by changing a UI label.
+## 마이그레이션
 
-## Recovery
+npm run db:migrate는 PostgreSQL에서 체크인된 SQL을 트랜잭션으로 적용하고 `_prisma_migrations`에 체크섬을 기록합니다. 실패는 롤백합니다. 적용한 과거 SQL은 수정하지 않고 새 마이그레이션을 추가합니다. db push로 기록을 우회하지 않습니다. 소스 스키마는 prisma/schema.prisma입니다. 시드는 기존 운영자 비밀번호와 계정 데이터를 유지합니다.
 
-Back up PostgreSQL, Redis and encrypted OAuth bindings before deployment changes. Preserve TOKEN_ENCRYPTION_KEY; rotating it without decrypting/re-encrypting stored tokens prevents access. Missing/expired token bindings require Settings reconnection. Provider submission ambiguity is recorded and blocks automatic duplicates; reconcile externally before manually preparing a new schedule. Clearing `.move-data` resets local demo edits and may remove local encrypted authorizations. Never delete it while the app or worker is writing.
+## 작업 처리기와 복구
 
-For cloud publication review and save the draft in environment settings, then publish. Publication snapshots files/dependencies; app/worker processes and runtime authentication must be reestablished in future tasks. No localhost preview link is supplied by onboarding.
+BullMQ 처리기 동시 실행 수는 2이며 작업 요청 속도를 제한하고 재시도·지수 지연·멱등 키를 사용합니다. 정기 일정의 시간대는 Asia/Seoul입니다. 데모 정기 작업은 실제 중복 정리와 저장된 예시의 주간 분석만 실행합니다. 실제 게시는 승인된 예약이 있어야 합니다. 결과가 불명확한 외부 쓰기 요청은 중복을 막기 위해 재시도하지 않습니다.
 
-## Docker behind the cloud proxy
+변경 전 PostgreSQL, Redis 및 암호화된 OAuth 저장소를 백업하세요. TOKEN_ENCRYPTION_KEY를 잃거나 단순 교체하면 저장한 토큰을 복호화할 수 없습니다. 만료 인증은 설정에서 다시 연결합니다. 예약 취소는 스튜디오에서 수행하며 실행 중인 외부 게시를 UI 상태 변경으로 취소했다고 표시하지 않습니다. 소유한 프로세스·컨테이너만 종료합니다.
 
-Use `npm run docker:build:cloud` when the build container cannot resolve the platform proxy or needs its trusted CA. The helper forwards the existing proxy by name and supplies `NODE_EXTRA_CA_CERTS` as a temporary BuildKit secret. The CA is not copied into the image, and verification is not disabled. Normal local networks can use `docker compose build`. For provider traffic inside containers, supply the platform-supported proxy route and trusted CA mount in your deployment; raw host environment paths are not assumed to exist inside the container. The host app/worker already inherit that runtime trust.
+## 점검과 클라우드 실행
 
-`npm run test:docker` verifies the built `the-move-os:local` image against the existing local Compose PostgreSQL service. It creates its own temporary database, Redis and Compose project on port 3100, checks login, empty non-demo metrics, project/media/audit persistence through an app restart, and genuine worker task completion. It cleans up only its own containers and database. Set `DOCKER_CHECK_PORT` if 3100 is occupied. No external provider credentials are needed or inspected.
+```sh
+npm run typecheck
+npm test
+npm run build
+CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
+```
 
-For a cloud task, `bash scripts/cloud-install.sh` installs, generates Prisma, typechecks, tests and builds without overwriting `.env`. Start long-running services with stdout/stderr redirected to ignored `.move-runtime` logs so a closed tool output pipe does not interrupt the server. Check an existing service before launching another instance.
+준비 상태는 health 요청뿐 아니라 로그인·workspace 데이터·주요 화면·실제 프로젝트 변경으로 확인합니다. npm run test:db는 별도 시험 데이터베이스에서, npm run test:docker는 만든 이미지와 기존 로컬 PostgreSQL을 이용한 별도 임시 DB·Redis·컨테이너에서 확인합니다.
+
+클라우드 설치는 bash scripts/cloud-install.sh를 사용합니다. 환경 저장 후 새 작업에서는 앱·처리기를 다시 실행해야 합니다. 로그를 `.move-runtime`에 남기고 기존 정상 실행 상태를 먼저 확인해 중복 프로세스를 만들지 않습니다. 이 클라우드의 localhost는 사용자 컴퓨터의 주소가 아니며 미리보기 링크를 제공하지 않습니다.
+
+클라우드 Docker 빌드는 npm run docker:build:cloud로 기존 프록시 경로와 제공된 CA를 BuildKit 임시 비밀로 전달합니다. CA를 이미지에 복사하거나 TLS 검증을 끄지 않습니다. 사용자 컴퓨터에서는 일반 docker compose build를 사용합니다. 컨테이너의 외부 API 요청도 배포 환경의 지원되는 프록시·CA 설정이 별도로 필요할 수 있습니다.

@@ -1,4 +1,5 @@
 "use client";
+import { koreanLabel } from "@/lib/korean";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -20,38 +21,38 @@ const agents: {
   v: number;
   color: string;
 }[] = [
-  { name: "Scout", role: "Source discovery", u: 2, v: 1.1, color: "#b59379" },
+  { name: "Scout", role: "출처 발견", u: 2, v: 1.1, color: "#b59379" },
   {
     name: "Researcher",
-    role: "Evidence & fact checking",
+    role: "근거 및 사실 확인",
     u: 5.3,
     v: 1.1,
     color: "#7f9c92",
   },
   {
     name: "Editor",
-    role: "Editorial preparation",
+    role: "편집 준비",
     u: 2,
     v: 3.9,
     color: "#a78891",
   },
   {
     name: "Designer",
-    role: "Canva production",
+    role: "Canva 제작",
     u: 5.3,
     v: 3.9,
     color: "#7d92ad",
   },
   {
     name: "Publisher",
-    role: "Publishing coordination",
+    role: "게시 진행",
     u: 2,
     v: 6.7,
     color: "#bc7d73",
   },
   {
     name: "Analyst",
-    role: "Performance analysis",
+    role: "성과 분석",
     u: 5.3,
     v: 6.7,
     color: "#a39a75",
@@ -210,48 +211,48 @@ export function Office() {
     <>
       <header className="page-header">
         <div>
-          <p className="eyebrow">A CLEAR VIEW OF THE WORK</p>
+          <p className="eyebrow">실제 작업 현황</p>
           <h1 className="page-title">
-            Virtual office<span className="text-[var(--muted-text)]">.</span>
+            가상 오피스<span className="text-[var(--muted-text)]">.</span>
           </h1>
           <p className="muted mt-2 text-sm">
-            Six specialists. One editorial rhythm.
+            여섯 담당 역할의 실제 작업을 확인하세요.
           </p>
         </div>
         <Button variant="outline" onClick={() => void refresh()}>
           <RefreshCw size={14} />
-          Refresh activity
+          활동 새로고침
         </Button>
       </header>
       <div className="flex flex-wrap gap-6 text-xs mb-6">
         <span className="flex gap-2 items-center">
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          {active} running
+          {active} 실행 중
         </span>
         <span className="flex gap-2 items-center">
           <Clock3 size={12} />
-          {queued} queued
+          {queued} 대기 중
         </span>
         <span className="muted">
-          Activity is derived from recorded background jobs · updates every 5s
+          활동은 기록된 백그라운드 작업을 기준으로 표시합니다 · 5초마다 갱신
         </span>
       </div>
       <div className="grid xl:grid-cols-[1fr_320px] gap-5">
         <section className="panel overflow-hidden">
           <div className="panel-header">
             <div>
-              <h2 className="font-medium text-sm">The floor</h2>
+              <h2 className="font-medium text-sm">작업실</h2>
               <p className="muted text-xs mt-1">
-                Select a workstation to inspect its tasks
+                작업대를 선택해 담당 작업을 확인하세요
               </p>
             </div>
-            <Badge>LIVE JOB EVENTS</Badge>
+            <Badge>실제 작업 이벤트</Badge>
           </div>
           <div className="relative bg-[var(--surface-raised)]">
             <svg
               viewBox="90 0 770 520"
               className="w-full min-h-[330px]"
-              aria-label="Isometric office with six agent workstations"
+              aria-label="여섯 담당 작업대가 있는 입체 오피스"
             >
               <defs>
                 <pattern
@@ -368,10 +369,10 @@ export function Office() {
                 const [x, y] = iso(a.u + 0.4, a.v + 1.5);
                 return (
                   <g
-                    key={a.name}
+                    key={koreanLabel(a.name)}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Inspect ${a.name}, ${task ? task.status.toLowerCase() : failed ? "error" : "idle"}`}
+                    aria-label={`${koreanLabel(a.name)} 작업 확인, ${task ? koreanLabel(task.status) : failed ? "오류" : "대기"}`}
                     onClick={() => setSelected(a.name)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -425,18 +426,18 @@ export function Office() {
                       fontSize="9"
                       fontWeight="600"
                     >
-                      {a.name}
+                      {koreanLabel(a.name)}
                     </text>
                   </g>
                 );
               })}
             </svg>
             <div className="px-5 pb-4 flex justify-between muted text-[10px]">
-              <span>THE MOVE OS / EDITORIAL FLOOR</span>
+              <span>THE MOVE OS / 편집 작업실</span>
               <span>
                 {reduced || osMotion
-                  ? "REDUCED MOTION"
-                  : "EVENT-DRIVEN ACTIVITY"}
+                  ? "움직임 줄이기"
+                  : "실제 이벤트에 따른 활동"}
               </span>
             </div>
           </div>
@@ -447,7 +448,7 @@ export function Office() {
               disabled={pending}
               onClick={() => void run("TOPIC_DEDUP")}
             >
-              Run topic deduplication
+              중복 주제 정리
               <ArrowUpRight size={12} />
             </Button>
             <Button
@@ -456,11 +457,11 @@ export function Office() {
               disabled={pending}
               onClick={() => void run("WEEKLY_REPORT")}
             >
-              Create weekly report
+              주간 보고서 생성
               <ArrowUpRight size={12} />
             </Button>
             <span className="muted text-xs">
-              Requires a connected Redis worker
+              실행 중인 Redis 작업 처리기가 필요합니다
             </span>
           </div>
         </section>
@@ -471,7 +472,7 @@ export function Office() {
                 <span className="h-7 w-7 rounded-lg flex items-center justify-center bg-[var(--muted)] text-xs font-bold">
                   {selected[0]}
                 </span>
-                <h2 className="font-semibold">{selected}</h2>
+                <h2 className="font-semibold">{koreanLabel(selected)}</h2>
               </div>
               <p className="muted text-xs mt-2">
                 {agents.find((a) => a.name === selected)?.role}
@@ -480,14 +481,14 @@ export function Office() {
             <Activity size={16} className="muted" />
           </div>
           <div className="p-5">
-            <p className="eyebrow mb-4">RECENT TASKS</p>
+            <p className="eyebrow mb-4">최근 작업</p>
             {tasks.length === 0 ? (
               <div className="py-8 text-center">
                 <Clock3 size={24} className="mx-auto muted mb-3" />
-                <p className="font-medium text-sm">Idle and ready</p>
+                <p className="font-medium text-sm">대기 중</p>
                 <p className="muted text-xs leading-relaxed mt-2">
-                  No recorded tasks for {selected}.<br />
-                  Work appears here when a real job runs.
+                  기록된 작업 없음: {koreanLabel(selected)}.<br />
+                  실제 작업이 실행되면 여기에 표시됩니다.
                 </p>
               </div>
             ) : (
@@ -512,7 +513,7 @@ export function Office() {
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium">
-                        {task.kind.toLowerCase().replaceAll("_", " ")}
+                        {koreanLabel(task.kind)}
                       </p>
                       <p className="muted text-xs mt-1 leading-relaxed break-words">
                         {task.message}
@@ -523,9 +524,9 @@ export function Office() {
                     <Badge
                       className={task.status === "FAILED" ? "text-red-600" : ""}
                     >
-                      {task.status}
+                      {koreanLabel(task.status)}
                     </Badge>
-                    {task.isDemo && <Badge>DEMO DATA</Badge>}
+                    {task.isDemo && <Badge>예시 데이터</Badge>}
                   </div>
                   {task.status === "RUNNING" && (
                     <div className="h-1 bg-[var(--muted)] rounded mt-3">
@@ -536,12 +537,14 @@ export function Office() {
                     </div>
                   )}
                   <p className="muted text-[10px] mt-2">
-                    {new Date(task.updatedAt).toLocaleString()}
+                    {new Date(task.updatedAt).toLocaleString("ko-KR", {
+                      timeZone: "Asia/Seoul",
+                    })}
                   </p>
                   {task.result && (
                     <details className="mt-3">
                       <summary className="cursor-pointer text-[10px] font-medium">
-                        Recorded result
+                        기록된 결과
                       </summary>
                       <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-[var(--muted)] p-2 text-[9px]">
                         {task.result}
@@ -553,7 +556,7 @@ export function Office() {
                     .slice(0, 2)
                     .map((e) => (
                       <p key={e.id} className="muted text-[10px] mt-1">
-                        {e.status} · {e.message}
+                        {koreanLabel(e.status)} · {e.message}
                       </p>
                     ))}
                 </div>
@@ -565,12 +568,12 @@ export function Office() {
       <div className="mt-5 flex flex-wrap gap-2">
         {agents.map((a) => (
           <Button
-            key={a.name}
+            key={koreanLabel(a.name)}
             size="sm"
             variant={selected === a.name ? "secondary" : "ghost"}
             onClick={() => setSelected(a.name)}
           >
-            {a.name}
+            {koreanLabel(a.name)}
           </Button>
         ))}
       </div>

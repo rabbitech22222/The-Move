@@ -14,10 +14,10 @@ export async function GET() {
     const state = (configured: boolean, details: string, expired = false) => ({
       configured,
       status: expired
-        ? "Expired"
+        ? "인증 만료"
         : configured
-          ? "Configured · unverified"
-          : "Disconnected",
+          ? "설정됨 · 접근 확인 전"
+          : "연결 안 됨",
       details,
     });
     return ok({
@@ -27,12 +27,12 @@ export async function GET() {
       integrations: {
         openai: state(
           !!process.env.OPENAI_API_KEY,
-          "AI is optional. Successful provider execution is required before results appear.",
+          "AI는 선택 기능입니다. 실제 API 실행 결과만 표시합니다.",
         ),
         canva: {
           ...state(
             canva.configured,
-            "OAuth and eligible brand-template datasets are required. Existing designs are preserved.",
+            "계정 인증과 자동 채우기가 가능한 브랜드 템플릿이 필요합니다. 기존 원본은 보존합니다.",
             canva.expired,
           ),
           oauthReady: !!(
@@ -45,7 +45,7 @@ export async function GET() {
         meta: {
           ...state(
             meta.configured,
-            "An authorized professional account, app review and account mapping are required.",
+            "@themovemag_ 프로페셔널 계정 인증, 앱 권한 검토와 정확한 계정 확인이 필요합니다.",
             meta.expired,
           ),
           oauthReady: !!(
@@ -57,7 +57,7 @@ export async function GET() {
         },
         redis: state(
           !!process.env.REDIS_URL,
-          "Connection settings exist only; actual jobs and worker results verify readiness.",
+          "설정 정보와 실행 상태는 별개입니다. 실제 작업 결과로 작동 여부를 확인하세요.",
         ),
       },
     });
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
         z.object({
           action: z.literal("connect-meta-account"),
           channelId: z.string(),
-          accountId: z.string().regex(/^\d+$/),
+          accountId: z.string().regex(/^\d+$/).optional(),
         }),
       ]),
     );
@@ -94,16 +94,16 @@ export async function POST(request: Request) {
         "Only an admin can change editorial rules and account mappings.",
       );
     if (input.action === "connect-meta-account") {
-      const { getIntegrationToken } = await import("@/lib/credentials");
-      const token = await getIntegrationToken("meta");
-      if (!token)
-        throw new HttpError(422, "META_DISCONNECTED", "Connect Meta first.");
-      const { officialApi } = await import("@/lib/integrations/http");
-      const { metaApiBase } = await import("@/lib/integrations/meta");
-      await officialApi(
-        `${metaApiBase()}/${input.accountId}?fields=id,username`,
-        { token },
-      );
+      if (input.channelId !== "the-move")
+        throw new HttpError(
+          409,
+          "ACCOUNT_SCOPE",
+          "현재 실제 연결 대상은 @themovemag_뿐입니다.",
+        );
+      const { connectTheMoveAccount } =
+        await import("@/lib/integrations/the-move-account");
+      await connectTheMoveAccount(user.id, input.accountId);
+      return ok(await getWorkspaceData());
     }
     if (input.action === "create-channel")
       return ok(
@@ -155,9 +155,6 @@ export async function POST(request: Request) {
               guidelines: channel.guidelines,
               changedAt: new Date().toISOString(),
             });
-          } else {
-            channel.platformAccountId = input.accountId;
-            channel.connected = true;
           }
         },
       ),

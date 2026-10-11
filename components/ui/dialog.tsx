@@ -13,7 +13,7 @@ export function DialogContent({ children }: { children: React.ReactNode }) {
         {children}
         <DialogPrimitive.Close
           className="absolute right-4 top-4 rounded p-1 hover:bg-[var(--muted)]"
-          aria-label="Close"
+          aria-label="닫기"
         >
           <X size={18} />
         </DialogPrimitive.Close>

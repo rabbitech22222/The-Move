@@ -14,6 +14,7 @@ const schema = z.object({
   publicationId: z.string().optional(),
   scheduledAt: z.iso.datetime().optional(),
   mediaUrl: z.url().optional(),
+  mediaUrls: z.array(z.url()).min(2).max(10).optional(),
   caption: z.string().min(1).max(2200).optional(),
 });
 export async function POST(request: Request) {
@@ -34,7 +35,30 @@ export async function POST(request: Request) {
           "MEDIA_REQUIRED",
           "Provide an HTTPS public media URL.",
         );
-      await validatePublicDestination(input.mediaUrl);
+      for (const url of input.mediaUrls ?? [input.mediaUrl]) {
+        if (!url.startsWith("https://"))
+          throw new HttpError(
+            400,
+            "HTTPS_REQUIRED",
+            "게시 파일에는 HTTPS 주소가 필요합니다.",
+          );
+        await validatePublicDestination(url);
+      }
+      if (
+        input.mediaUrls &&
+        new Set(input.mediaUrls).size !== input.mediaUrls.length
+      )
+        throw new HttpError(
+          400,
+          "DUPLICATE_MEDIA",
+          "같은 이미지를 중복 등록할 수 없습니다.",
+        );
+      if (input.mediaUrls && input.mediaUrl !== input.mediaUrls[0])
+        throw new HttpError(
+          400,
+          "MEDIA_ORDER",
+          "첫 이미지 주소와 이미지 목록이 일치해야 합니다.",
+        );
       if (!input.mediaUrl.startsWith("https://"))
         throw new HttpError(
           400,
@@ -79,6 +103,24 @@ export async function POST(request: Request) {
         const project = data.projects.find((p) => p.id === input.projectId);
         if (!project)
           throw new HttpError(404, "NOT_FOUND", "Project not found.");
+        if (project.channelId !== "the-move")
+          throw new HttpError(
+            409,
+            "ACCOUNT_SCOPE",
+            "현재 실제 게시 대상은 @themovemag_뿐입니다.",
+          );
+        if (project.format === "CAROUSEL" && !input.mediaUrls?.length)
+          throw new HttpError(
+            400,
+            "CAROUSEL_MEDIA_REQUIRED",
+            "순서대로 검토한 이미지 주소 2~10개를 입력하세요.",
+          );
+        if (project.format === "REEL" && input.mediaUrls?.length)
+          throw new HttpError(
+            400,
+            "MEDIA_FORMAT",
+            "릴스는 영상 주소 하나만 사용합니다.",
+          );
         if (input.action === "approve") {
           if (project.stage !== "APPROVED")
             throw new HttpError(
@@ -112,6 +154,7 @@ export async function POST(request: Request) {
             payloadHash: publicationFingerprint(
               input.mediaUrl!,
               input.caption || "",
+              input.mediaUrls,
             ),
           });
           return;
@@ -124,7 +167,11 @@ export async function POST(request: Request) {
               a.kind === "PUBLICATION" &&
               a.revisionAt === project.updatedAt &&
               a.payloadHash ===
-                publicationFingerprint(input.mediaUrl!, input.caption || ""),
+                publicationFingerprint(
+                  input.mediaUrl!,
+                  input.caption || "",
+                  input.mediaUrls,
+                ),
           )
         )
           throw new HttpError(
@@ -157,12 +204,6 @@ export async function POST(request: Request) {
             "ALREADY_SCHEDULED",
             "This project already has an active or completed publication.",
           );
-        if (project.format === "CAROUSEL")
-          throw new HttpError(
-            422,
-            "CAROUSEL_SETUP_REQUIRED",
-            "Multi-page publishing requires approved exported images and a child-container workflow. Use the manual export workflow; no single-image carousel substitute is allowed.",
-          );
         if (!input.caption)
           throw new HttpError(
             400,
@@ -178,6 +219,7 @@ export async function POST(request: Request) {
           platformPostId: null,
           error: null,
           mediaUrl: input.mediaUrl!,
+          mediaUrls: input.mediaUrls ?? [],
           caption: input.caption,
         });
         project.stage = "SCHEDULED";

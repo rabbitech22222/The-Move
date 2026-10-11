@@ -118,6 +118,20 @@ async function readDemo(): Promise<WorkspaceData> {
         "Invalid demo data. Preserve the file and fix its structure; it was not replaced.",
       );
     }
+    for (const operator of data.operators) {
+      if (operator.name === "Operator 1") operator.name = "운영자 1";
+      if (operator.name === "Operator 2") operator.name = "운영자 2";
+    }
+    const move = data.channels.find((c) => c.id === "the-move");
+    if (move && !move.connected && move.handle === "@themove")
+      move.handle = "@themovemag_";
+    const referenceNames: Record<string, string> = {
+      "THE MOVE • Operator 1 carousel": "THE MOVE · 운영자 1 캐러셀",
+      "THE MOVE • Operator 2 carousel": "THE MOVE · 운영자 2 캐러셀",
+      "THE MOVE • Landscape video reel": "THE MOVE · 가로 영상 릴스",
+    };
+    for (const template of data.templates)
+      template.name = referenceNames[template.name] ?? template.name;
     if (data.assets === undefined) data.assets = [];
     if (!Array.isArray(data.assets))
       throw new Error("Invalid demo assets. Existing data was preserved.");
@@ -319,6 +333,8 @@ async function readDatabase(tx: Transaction): Promise<WorkspaceData> {
       designId: row.designId,
       width: row.width,
       height: row.height,
+      configuration: (row.configuration ??
+        undefined) as import("./domain").CanvaTemplate["configuration"],
       inspectedAt: optionalIso(row.inspectedAt),
       fields: row.fields,
       status: row.status,
@@ -330,6 +346,8 @@ async function readDatabase(tx: Transaction): Promise<WorkspaceData> {
       templateId: row.templateId,
       status: row.status,
       editUrl: row.editUrl,
+      exportJobId: row.exportJobId ?? undefined,
+      exportUrls: row.exportUrls,
       externalId: row.externalId,
       error: row.error,
       createdAt: iso(row.createdAt),
@@ -369,6 +387,7 @@ async function readDatabase(tx: Transaction): Promise<WorkspaceData> {
       status: row.status,
       platformPostId: row.platformPostId,
       error: row.error,
+      mediaUrls: row.mediaUrls,
       mediaUrl: row.mediaUrl,
       caption: row.caption,
     })),

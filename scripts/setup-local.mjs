@@ -11,5 +11,5 @@ if (!existsSync(".env")) {
       `TOKEN_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}`,
     );
   writeFileSync(".env", data, { mode: 0o600 });
-  console.log("Created local .env with random keys; demo mode enabled.");
-} else console.log("Existing .env preserved.");
+  console.log("임의 보안 키로 로컬 .env를 만들었습니다. 데모 모드를 사용합니다.");
+} else console.log("기존 .env 설정을 유지합니다.");

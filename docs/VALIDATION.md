@@ -1,18 +1,20 @@
-# Validation record — 2026-10-11
+# 실행 검증 기록 — 2026-10-11
 
-Validated in the current cloud workspace using Node 24, local PostgreSQL 17, Redis 7 and Chromium. This records observed execution, not external provider readiness.
+Node.js 24, PostgreSQL 17, Redis 7과 Chromium에서 실제 실행한 결과입니다. 외부 서비스의 인증 없는 계약 테스트와 실제 계정 검증을 구분합니다.
 
-| Check                         | Observed result                                                                                                                                                                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Repeatable cloud installation | `bash scripts/cloud-install.sh` completed: locked dependency installation, existing `.env` preserved, Prisma generated, typecheck, unit suite and production build                                                                                     |
-| Unit suite                    | 95 tests passed across 6 files; security, provenance, SSRF, approvals, template constraints, ambiguous publishing, missing metrics and concurrent demo persistence                                                                                     |
-| Browser suite                 | 14 tests passed: both operators, all seven pages, persistent editorial edits, approval guards, assets, disconnected integrations, honest Office, reporting periods, themes/motion, channel creation and manual Canva copy review                       |
-| PostgreSQL                    | Real migrations/checksums, failed-migration rollback, non-destructive reseeding, concurrent normalized writes, assets, audit records and credential-table structure verified in a separate test database                                               |
-| Redis worker                  | Deduplication and weekly reports completed with persisted QUEUED/RUNNING/SUCCEEDED events and actual results                                                                                                                                           |
-| Docker                        | Proxy/CA-aware image build passed with TLS verification intact; isolated non-demo app verified login, no synthetic metrics, project/asset/audit persistence after restart; isolated worker completed both jobs; temporary services/database cleaned up |
-| Dependency audit              | No vulnerabilities reported after updating test tooling and the Prisma configuration dependency                                                                                                                                                        |
-| RSS ingestion                 | GitHub Next.js release Atom feed fetched successfully; 10 real normalized items, repeated ingestion added 0 and recognized 10 duplicates; run in an isolated demo directory                                                                            |
+| 검증 | 관찰한 결과 |
+| --- | --- |
+| 단위 테스트 | 8개 파일, **116개 통과**. 계정 이름·ID 검증, 순서가 있는 캐러셀 승인, Canva 원본 보호·영상 필드·페이지별 내보내기, 불명확한 게시 응답의 중복 요청 방지, 보안·출처 검증, 로컬 실행기 설정 보존 포함 |
+| 브라우저 | **14개 통과**. 한국어 로그인·7개 화면, 두 운영자, 편집 내용 저장, 승인 조건, 자료 등록, 연결되지 않은 상태, 실제 작업을 표시하는 오피스, 보고 기간·테마·동작 설정, 수동 Canva 사본 검토 |
+| 데이터베이스 | 별도 실제 데이터베이스에 마이그레이션 적용. 체크섬·실패 시 롤백·기존 데이터 보존·동시 쓰기·감사 기록 검증. 신규 Canva 설정, 내보내기 작업 및 URL, 게시 이미지 순서 저장·재조회 확인 |
+| Redis 작업 처리기 | 중복 정리와 주간 보고가 실제 QUEUED → RUNNING → SUCCEEDED 이벤트 및 결과를 저장 |
+| Docker 운영 환경 | 이미지 빌드와 독립 운영 앱 검증 통과. 두 운영자 로그인, 예시 지표가 없는 상태, 편집 내용·자료·감사 기록의 재시작 후 유지, 실제 작업 처리 완료 확인 |
+| 실제 운영 실행기 | Linux에서 새 `.env.live`와 독립 `the-move-live` 프로젝트로 실행. PostgreSQL·Redis·앱·작업 처리기 시작 후 실제 로그인, 비데모 상태 및 작업 완료 확인. Windows의 Docker Desktop 실행은 아직 별도 검증하지 않음 |
+| Windows 데모 실행기 | 이전 버전의 새 설치·공백 포함 경로·로그인·브라우저 검증은 GitHub Actions에서 통과. 이번 한국어 버전의 Windows 결과는 아래에 별도로 기록 예정 |
+| 타입·빌드 | 타입 검사와 Next.js 프로덕션 빌드 통과 |
 
-Canva Connect, Meta metrics/publishing and OpenAI credentialed end-to-end execution remain unverified. Unit mocks do not establish provider success. OAuth scopes, Brand Template datasets/eligibility, authorized Instagram accounts and provider-specific media constraints need verification with the intended accounts.
+실제 Canva·Meta 인증 정보가 이 환경에 제공되지 않았습니다. **원본 디자인의 실제 모습·필드 검사, 인증된 Canva 생성·내보내기, @themovemag_ 지표 조회·실제 게시의 외부 서비스 종단 검증은 미완료**입니다. API 응답을 대체한 테스트는 해당 서비스의 성공을 증명하지 않습니다. 실제 계정의 권한, 앱 검토, Autofill 이용 자격, 미디어 적합성도 인증 후 확인해야 합니다.
 
-The environment configuration draft was saved. Publishing and restoration in a fresh cloud task have not been tested. App/worker processes must restart in each task; installed files and dependency snapshots do not constitute service readiness.
+GPT에 연결된 외부 플러그인은 이 코딩 대화의 도구에 노출되지 않았으며 다운로드한 앱으로 그 인증이 자동 전달되지 않습니다. [실제 연결 및 게시 안내](REAL_PUBLISH_KO.md)를 따르세요. 비밀 값은 채팅·소스 코드·실행 패키지에 넣지 않습니다.
+
+기존 클라우드 설치 및 시작 설정은 유지합니다. 이 실행 기록은 현재 환경의 검증이며, 새 클라우드 작업에서 설정 복원까지 검증했다는 의미는 아닙니다.

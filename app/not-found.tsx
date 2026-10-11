@@ -4,9 +4,11 @@ export default function NotFound() {
     <main className="min-h-screen flex items-center justify-center p-8">
       <div>
         <p className="eyebrow">404 / THE MOVE OS</p>
-        <h1 className="text-3xl font-semibold mt-3">This page moved.</h1>
+        <h1 className="text-3xl font-semibold mt-3">
+          페이지를 찾을 수 없습니다.
+        </h1>
         <Link className="text-red-600 mt-6 inline-block" href="/">
-          Return to the workspace →
+          작업 공간으로 돌아가기 →
         </Link>
       </div>
     </main>

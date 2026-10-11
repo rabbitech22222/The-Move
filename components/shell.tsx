@@ -27,13 +27,13 @@ import { useWorkspace } from "@/components/workspace-provider";
 import type { Operator } from "@/lib/domain";
 
 const navigation = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
-  { label: "Intelligence", href: "/intelligence", icon: Radar },
-  { label: "Studio", href: "/studio", icon: PanelsTopLeft },
-  { label: "Canva Factory", href: "/canva", icon: Shapes },
-  { label: "Office", href: "/office", icon: Building2 },
-  { label: "Analytics", href: "/analytics", icon: ChartNoAxesCombined },
-  { label: "Settings", href: "/settings", icon: Settings2 },
+  { label: "대시보드", href: "/", icon: LayoutDashboard },
+  { label: "정보 수집", href: "/intelligence", icon: Radar },
+  { label: "스튜디오", href: "/studio", icon: PanelsTopLeft },
+  { label: "캔바 제작소", href: "/canva", icon: Shapes },
+  { label: "오피스", href: "/office", icon: Building2 },
+  { label: "분석", href: "/analytics", icon: ChartNoAxesCombined },
+  { label: "설정", href: "/settings", icon: Settings2 },
 ];
 
 export function Shell({
@@ -75,11 +75,11 @@ export function Shell({
     try {
       const response = await fetch("/api/auth", { method: "DELETE" });
       if (!response.ok)
-        throw new Error("Could not sign out. Please try again.");
+        throw new Error("로그아웃하지 못했습니다. 다시 시도하세요.");
       window.location.assign("/login");
     } catch (cause) {
       setLogoutError(
-        cause instanceof Error ? cause.message : "Could not sign out.",
+        cause instanceof Error ? cause.message : "로그아웃하지 못했습니다.",
       );
     }
   };
@@ -90,7 +90,7 @@ export function Shell({
     <div className="workspace-shell">
       <aside
         className={`sidebar ${mobileOpen ? "mobile-open" : ""}`}
-        aria-label="Main navigation"
+        aria-label="주 메뉴"
       >
         <Link
           href="/"
@@ -107,15 +107,15 @@ export function Shell({
         <div className="workspace-switcher">
           <span className="workspace-avatar">TM</span>
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold">Editorial workspace</div>
+            <div className="text-[11px] font-semibold">편집 작업 공간</div>
             <div className="text-[9px] muted mt-0.5">
-              {data?.operators.length ?? 2} operators ·{" "}
-              {data?.channels.length ?? 3} brands
+              {data?.operators.length ?? 2} 명 운영자 ·{" "}
+              {data?.channels.length ?? 3} 개 브랜드
             </div>
           </div>
           <Command size={12} className="muted" />
         </div>
-        <p className="nav-group-label">WORKSPACE</p>
+        <p className="nav-group-label">작업 공간</p>
         <nav className="sidebar-nav">
           {navigation.map(({ label, href, icon: Icon }) => {
             const isActive = active?.href === href;
@@ -138,13 +138,13 @@ export function Shell({
           <Link href="/settings" className="sidebar-note block">
             <div className="sidebar-note-title">
               <FlaskConical size={13} className="muted" />
-              {data?.demo ? "Your demo workspace" : "Connection status"}
+              {data?.demo ? "데모 작업 공간" : "연결 상태"}
               <ArrowUpRight size={12} className="ml-auto muted" />
             </div>
             <p>
               {data?.demo
-                ? "Explore the workflow. All sample metrics are clearly labeled."
-                : "Manage accounts, integrations, and workspace preferences."}
+                ? "제작 흐름을 살펴보세요. 모든 예시 지표에는 표시가 있습니다."
+                : "계정과 서비스 연결, 작업 공간 환경을 관리합니다."}
             </p>
           </Link>
           <div className="operator-chip">
@@ -160,15 +160,13 @@ export function Shell({
                 {operator.name}
               </div>
               <div className="text-[9px] muted mt-0.5">
-                {operator.role === "ADMIN"
-                  ? "Workspace admin"
-                  : "Editorial operator"}
+                {operator.role === "ADMIN" ? "작업 공간 관리자" : "편집 운영자"}
               </div>
             </div>
             <button
               onClick={() => void signOut()}
-              title="Sign out"
-              aria-label="Sign out"
+              title="로그아웃"
+              aria-label="로그아웃"
               className="muted hover:text-[var(--accent)]"
             >
               <LogOut size={14} />
@@ -186,26 +184,26 @@ export function Shell({
           <div className="flex items-center gap-3">
             <button
               className="icon-button mobile-menu"
-              aria-label="Toggle navigation"
+              aria-label="메뉴 열기·닫기"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
             >
               <Menu size={16} />
             </button>
             <div className="breadcrumb">
-              <span>Workspace</span>
+              <span>작업 공간</span>
               <ChevronRight size={11} className="breadcrumb-separator" />
-              <strong>{active?.label || "Workspace"}</strong>
+              <strong>{active?.label || "작업 공간"}</strong>
             </div>
           </div>
           <div className="topbar-actions">
-            {data?.demo && <span className="demo-label">DEMO MODE</span>}
+            {data?.demo && <span className="demo-label">데모 모드</span>}
             <button
               className="icon-button"
               aria-label={
                 theme === "light"
-                  ? "Switch to dark mode"
-                  : "Switch to light mode"
+                  ? "어두운 화면으로 변경"
+                  : "밝은 화면으로 변경"
               }
               onClick={toggleTheme}
             >
@@ -214,7 +212,7 @@ export function Shell({
             <Button asChild size="sm" className="!text-[10px] !h-8 !px-3">
               <Link href="/studio?new=1">
                 <Plus size={13} />
-                <span className="topbar-new-label">New project</span>
+                <span className="topbar-new-label">새 프로젝트</span>
               </Link>
             </Button>
           </div>

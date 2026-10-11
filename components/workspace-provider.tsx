@@ -33,13 +33,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       const result = await response.json();
       if (!response.ok || !result.data)
         throw new Error(
-          result.error || "Unable to load the workspace. Please try again.",
+          result.error || "작업 공간을 불러오지 못했습니다. 다시 시도하세요.",
         );
       setData(result.data);
       setError(null);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Unable to load workspace.",
+        cause instanceof Error
+          ? cause.message
+          : "작업 공간을 불러오지 못했습니다.",
       );
     } finally {
       setLoading(false);
@@ -56,15 +58,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         });
         const result = await response.json();
         if (!response.ok)
-          throw new Error(
-            result.error || "This action could not be completed.",
-          );
+          throw new Error(result.error || "작업을 완료하지 못했습니다.");
         if (result.data?.workspaceName) setData(result.data);
         else await refresh();
         setNotice(
           typeof result.message === "string"
             ? result.message
-            : "Workspace updated.",
+            : "작업 공간을 갱신했습니다.",
         );
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => setNotice(null), 4000);
@@ -72,7 +72,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         const message =
           cause instanceof Error
             ? cause.message
-            : "This action could not be completed.";
+            : "작업을 완료하지 못했습니다.";
         setError(message);
         throw new Error(message);
       }
@@ -107,7 +107,7 @@ export function useWorkspace() {
 
 export function WorkspaceLoading() {
   return (
-    <div aria-label="Loading workspace" role="status">
+    <div aria-label="작업 공간 불러오는 중" role="status">
       <div className="skeleton h-9 w-56 mb-8" />
       <div className="stat-grid">
         {[0, 1, 2, 3].map((i) => (
@@ -128,7 +128,7 @@ export function WorkspaceError() {
         className="flex items-center gap-1 shrink-0"
         onClick={() => void refresh()}
       >
-        <RefreshCw size={12} /> Retry
+        <RefreshCw size={12} /> 재시도
       </button>
     </div>
   ) : null;

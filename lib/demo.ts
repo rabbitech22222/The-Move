@@ -4,13 +4,13 @@ export const WORKSPACE_ID = "the-move";
 export const demoOperators = [
   {
     id: "operator-1",
-    name: "Operator 1",
+    name: "운영자 1",
     email: "operator1@themove.local",
     role: "ADMIN" as const,
   },
   {
     id: "operator-2",
-    name: "Operator 2",
+    name: "운영자 2",
     email: "operator2@themove.local",
     role: "OPERATOR" as const,
   },
@@ -21,11 +21,11 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
     {
       id: "the-move",
       name: "THE MOVE",
-      handle: "@themove",
+      handle: "@themovemag_",
       accent: "#ef4444",
       connected: false,
       guidelines:
-        "Lead with a clear editorial angle. Attribute factual claims. Use concise headlines and preserve THE MOVE branding. Reels must use landscape-video placement in design DAHPcvVkH8k.",
+        "명확한 편집 관점으로 시작합니다. 사실 주장에는 출처를 표기합니다. 간결한 제목과 THE MOVE 브랜드를 유지합니다. 릴스는 DAHPcvVkH8k의 가로 영상 배치만 사용합니다.",
       guidelineVersion: 1,
     },
     {
@@ -35,7 +35,7 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
       accent: "#6366f1",
       connected: false,
       guidelines:
-        "Explain Korean culture with context. Verify transliterations, dates and source credits. Avoid treating a trend as universal.",
+        "맥락과 함께 한국 문화를 설명합니다. 표기, 날짜와 출처를 검증하고 일부 유행을 보편적 현상으로 단정하지 않습니다.",
       guidelineVersion: 1,
     },
     {
@@ -45,7 +45,7 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
       accent: "#10b981",
       connected: false,
       guidelines:
-        "Use precise, restrained language. Separate facts from opinions and include primary sources where possible.",
+        "정확하고 절제된 표현을 사용합니다. 사실과 의견을 구분하고 가능한 한 1차 출처를 포함합니다.",
       guidelineVersion: 1,
     },
   ];
@@ -63,7 +63,7 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
     templates: [
       {
         id: "move-carousel-1",
-        name: "THE MOVE • Operator 1 carousel",
+        name: "THE MOVE · 운영자 1 캐러셀",
         channelId: "the-move",
         format: "CAROUSEL",
         operatorId: "operator-1",
@@ -77,7 +77,7 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
       },
       {
         id: "move-carousel-2",
-        name: "THE MOVE • Operator 2 carousel",
+        name: "THE MOVE · 운영자 2 캐러셀",
         channelId: "the-move",
         format: "CAROUSEL",
         operatorId: "operator-2",
@@ -91,7 +91,7 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
       },
       {
         id: "move-reel-landscape",
-        name: "THE MOVE • Landscape video reel",
+        name: "THE MOVE · 가로 영상 릴스",
         channelId: "the-move",
         format: "REEL",
         operatorId: null,
@@ -154,13 +154,13 @@ export function createDemoData(now = new Date()): WorkspaceData {
         id: postId,
         channelId: channel.id,
         title: [
-          "Demo · A new perspective on city life",
-          "Demo · The details behind the trend",
-          "Demo · Design worth a closer look",
-          "Demo · Culture in motion",
+          "예시 · 도시 생활의 새로운 시선",
+          "예시 · 유행을 만드는 작은 차이",
+          "예시 · 자세히 볼 만한 디자인",
+          "예시 · 움직이는 문화",
         ][item % 4],
         format: item % 3 === 0 ? "REEL" : "CAROUSEL",
-        category: ["Culture", "Design", "Lifestyle"][item % 3],
+        category: ["문화", "디자인", "라이프스타일"][item % 3],
         publishedAt: postDate.toISOString(),
         permalink: null,
         source: "DEMO",
@@ -183,23 +183,23 @@ export function createDemoData(now = new Date()): WorkspaceData {
   data.sources = [
     {
       id: "demo-manual-source",
-      name: "Demo example source (fixture)",
+      name: "데모 예시 출처",
       url: "https://example.com/demo",
       type: "MANUAL",
       enabled: false,
-      rights: "Illustrative demo fixture; no retrieved article or evidence.",
+      rights: "데모용 예시입니다. 실제로 수집한 기사나 근거가 아닙니다.",
       lastFetchedAt: null,
       lastError: null,
     },
   ];
   data.topics = [
-    "Independent spaces shaping city culture",
-    "A closer look at contemporary Korean design",
-    "Why typography changes how a story reads",
+    "도시 문화를 만드는 독립 공간",
+    "한국 현대 디자인 살펴보기",
+    "타이포그래피가 읽기에 미치는 영향",
   ].map((title, index) => ({
     id: `demo-topic-${index}`,
-    title: `Demo · ${title}`,
-    category: ["Culture", "Design", "Editorial"][index],
+    title: `예시 · ${title}`,
+    category: ["문화", "디자인", "편집"][index],
     sourceId: "demo-manual-source",
     sourceUrl: `https://example.com/demo/topic-${index}`,
     publishedAt: null,
@@ -207,19 +207,19 @@ export function createDemoData(now = new Date()): WorkspaceData {
     relevance: 70 + index * 5,
     confidence: "LOW",
     scoreExplanation:
-      "Illustrative score only. Live scores use keyword matches and recency, with the weighting shown.",
+      "예시 점수입니다. 실제 점수는 키워드 일치와 최신성을 기준으로 산정하며 가중치를 설명합니다.",
     recommendedChannelId: data.channels[index].id,
     format: "CAROUSEL",
     status: "INBOX",
     uncertainClaims: [
-      "This is a demo idea without verified research. Add real sources before approval.",
+      "검증된 조사 자료가 없는 데모 아이디어입니다. 승인 전 실제 출처를 추가하세요.",
     ],
-    rights: "Demo fixture, not a licensed source.",
+    rights: "이용 허가를 받은 출처가 아닌 데모 예시입니다.",
   }));
   data.projects = [
     {
       id: "demo-project-1",
-      title: "Demo · The city after hours",
+      title: "예시 · 도시의 늦은 시간",
       channelId: "the-move",
       operatorId: "operator-1",
       stage: "IDEA",
@@ -233,13 +233,13 @@ export function createDemoData(now = new Date()): WorkspaceData {
     },
     {
       id: "demo-project-2",
-      title: "Demo · Small spaces, big stories",
+      title: "예시 · 작은 공간의 큰 이야기",
       channelId: "korea-coded",
       operatorId: "operator-2",
       stage: "RESEARCH",
       format: "CAROUSEL",
       draftCopy:
-        "Working angle: explore the people behind independent spaces. Verify all claims and add primary sources.",
+        "편집 방향: 독립 공간을 만드는 사람들을 조사합니다. 모든 주장을 검증하고 1차 출처를 추가하세요.",
       sourceUrls: [],
       dueAt: dateAt(-3).toISOString(),
       productionMinutes: 0,
@@ -248,13 +248,13 @@ export function createDemoData(now = new Date()): WorkspaceData {
     },
     {
       id: "demo-project-3",
-      title: "Demo · How good design travels",
+      title: "예시 · 좋은 디자인의 확산",
       channelId: "the-standard",
       operatorId: "operator-1",
       stage: "DRAFT",
       format: "CAROUSEL",
       draftCopy:
-        "A design story starts with one precise observation.\n\n[Add verified examples and source credits before review.]",
+        "디자인 이야기는 정확한 관찰에서 시작합니다.\n\n[검토 전 검증된 사례와 출처를 추가하세요.]",
       sourceUrls: [],
       dueAt: dateAt(-4).toISOString(),
       productionMinutes: 0,
@@ -263,13 +263,12 @@ export function createDemoData(now = new Date()): WorkspaceData {
     },
     {
       id: "demo-project-4",
-      title: "Demo · A moment in motion",
+      title: "예시 · 움직임 속의 순간",
       channelId: "the-move",
       operatorId: "operator-2",
       stage: "DESIGN",
       format: "REEL",
-      draftCopy:
-        "Culture in motion.\n[Headline and source credit pending verification.]",
+      draftCopy: "움직이는 문화.\n[제목과 출처를 검증하세요.]",
       sourceUrls: [],
       dueAt: dateAt(-1).toISOString(),
       productionMinutes: 0,
@@ -278,13 +277,13 @@ export function createDemoData(now = new Date()): WorkspaceData {
     },
     {
       id: "demo-project-5",
-      title: "Demo · Objects with a point of view",
+      title: "예시 · 관점이 담긴 사물",
       channelId: "the-standard",
       operatorId: "operator-2",
       stage: "REVIEW",
       format: "CAROUSEL",
       draftCopy:
-        "Editorial review fixture. No facts are approved; add research before proceeding.",
+        "편집 검토 예시입니다. 승인된 사실이 없으므로 조사 자료를 추가하세요.",
       sourceUrls: [],
       dueAt: dateAt(-2).toISOString(),
       productionMinutes: 0,

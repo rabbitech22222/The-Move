@@ -70,6 +70,14 @@ export async function syncInstagramMetrics(
       "Connect Meta with authorized Instagram account and insights permissions.",
       409,
     );
+  const { verifyTheMoveAccount } = await import("./the-move-account");
+  if (channelId !== "the-move")
+    throw new ServiceError(
+      "ACCOUNT_SCOPE",
+      "현재 실제 연결 대상은 @themovemag_뿐입니다.",
+      409,
+    );
+  await verifyTheMoveAccount(channel.platformAccountId, token);
   const accountId = encodeURIComponent(channel.platformAccountId);
   const base = metaApiBase();
   const account = await officialApi<{ id: string; followers_count?: number }>(
@@ -95,7 +103,7 @@ export async function syncInstagramMetrics(
   const unavailable: string[] = [];
   const values: Record<string, number | null> = {};
   // Fetch independently: unsupported metrics stay null instead of being replaced with zero.
-  for (const metric of ["views", "reach", "total_interactions"]) {
+  for (const metric of ["조회", "reach", "total_interactions"]) {
     try {
       const response = await officialApi<{ data?: Insight[] }>(
         `${base}/${accountId}/insights?metric=${metric}&period=day&metric_type=total_value&since=${start / 1000}&until=${end / 1000}`,
@@ -149,7 +157,7 @@ export async function syncInstagramMetrics(
   for (const post of media.slice(0, 20)) {
     const metrics: Record<string, number | null> = {};
     for (const metric of [
-      "views",
+      "조회",
       "reach",
       "likes",
       "comments",

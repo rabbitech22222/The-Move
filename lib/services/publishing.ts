@@ -4,21 +4,32 @@ import { getIntegrationToken } from "../credentials";
 import type { Approval, Project, ScheduledPublication } from "../domain";
 import { officialApi, validatePublicDestination } from "../integrations/http";
 import { metaApiBase } from "../integrations/meta";
+import { verifyTheMoveAccount } from "../integrations/the-move-account";
 import { ServiceError, errorMessage } from "./errors";
 
 export function publicationFingerprint(
   mediaUrl: string,
   caption: string,
+  mediaUrls?: string[],
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify({ mediaUrl, caption }))
+    .update(
+      JSON.stringify(
+        mediaUrls?.length
+          ? { mediaUrl, caption, mediaUrls }
+          : { mediaUrl, caption },
+      ),
+    )
     .digest("hex");
 }
 
 export function assertPublicationApproved(
   project: Project,
   approvals: Approval[],
-  publication?: Pick<ScheduledPublication, "mediaUrl" | "caption">,
+  publication?: Pick<
+    ScheduledPublication,
+    "mediaUrl" | "caption" | "mediaUrls"
+  >,
 ): void {
   if (!["APPROVED", "SCHEDULED"].includes(project.stage))
     throw new ServiceError(
@@ -50,7 +61,11 @@ export function assertPublicationApproved(
         a.revisionAt === project.updatedAt &&
         (!publication ||
           a.payloadHash ===
-            publicationFingerprint(publication.mediaUrl, publication.caption)),
+            publicationFingerprint(
+              publication.mediaUrl,
+              publication.caption,
+              publication.mediaUrls,
+            )),
     )
   ) {
     throw new ServiceError(
@@ -106,12 +121,6 @@ export async function publishScheduledPublication(
       "The approved scheduled publication is not due yet.",
       409,
     );
-  if (project.format !== "REEL")
-    throw new ServiceError(
-      "CAROUSEL_SETUP_REQUIRED",
-      "Instagram carousels require an approved ordered asset list and child containers. The current single-media scheduler supports reels only; publish carousels manually until that workflow is configured.",
-      409,
-    );
   const channel = data.channels.find((c) => c.id === project.channelId);
   if (!channel?.platformAccountId)
     throw new ServiceError(
@@ -126,7 +135,37 @@ export async function publishScheduledPublication(
       "Connect Meta with authorized Instagram content-publishing permissions.",
       409,
     );
-  await validatePublicDestination(publication.mediaUrl);
+  if (channel.id !== "the-move")
+    throw new ServiceError(
+      "ACCOUNT_SCOPE",
+      "현재 게시 대상은 @themovemag_뿐입니다.",
+      409,
+    );
+  // Identity is checked immediately before a provider submission, including resumed jobs.
+  await verifyTheMoveAccount(channel.platformAccountId, token);
+  const mediaUrls =
+    project.format === "CAROUSEL"
+      ? (publication.mediaUrls ?? [])
+      : [publication.mediaUrl];
+  if (
+    project.format === "CAROUSEL" &&
+    (mediaUrls.length < 2 ||
+      mediaUrls.length > 10 ||
+      new Set(mediaUrls).size !== mediaUrls.length)
+  )
+    throw new ServiceError(
+      "CAROUSEL_MEDIA_REQUIRED",
+      "캐러셀에는 순서가 정해진 서로 다른 이미지 주소 2~10개가 필요합니다.",
+      409,
+    );
+  for (const url of mediaUrls) {
+    if (!url.startsWith("https://"))
+      throw new ServiceError(
+        "HTTPS_REQUIRED",
+        "게시 미디어는 공개 HTTPS 주소여야 합니다.",
+      );
+    await validatePublicDestination(url);
+  }
   const existingContainer = data.audit.find(
     (a) =>
       a.entityId === publicationId &&
@@ -157,7 +196,18 @@ export async function publishScheduledPublication(
           const current = draft.publications.find(
             (p) => p.id === publicationId,
           )!;
-          if (current.status !== "SCHEDULED")
+          if (
+            current.status !== "SCHEDULED" &&
+            !(
+              project.format === "CAROUSEL" &&
+              current.status === "RUNNING" &&
+              draft.audit.some(
+                (a) =>
+                  a.entityId.startsWith(`${publicationId}:child:`) &&
+                  a.action === "INSTAGRAM_CHILD_CREATED",
+              )
+            )
+          )
             throw new ServiceError(
               "RECONCILIATION_REQUIRED",
               "A container request is already pending. Reconcile the provider result before retrying.",
@@ -171,17 +221,164 @@ export async function publishScheduledPublication(
           current.error = null;
         },
       );
+      let children: string[] = [];
+      if (project.format === "CAROUSEL") {
+        // Known child IDs are persisted one at a time; a pending child submission is never silently repeated.
+        for (let index = 0; index < mediaUrls.length; index++) {
+          const latest = await getWorkspaceData();
+          const entityId = `${publicationId}:child:${index}`;
+          const recorded = latest.audit.find(
+            (a) =>
+              a.entityId === entityId && a.action === "INSTAGRAM_CHILD_CREATED",
+          );
+          let id = recorded?.details;
+          if (!id) {
+            if (
+              latest.audit.some(
+                (a) =>
+                  a.entityId === entityId &&
+                  a.action === "INSTAGRAM_CHILD_REQUESTED",
+              )
+            )
+              throw new ServiceError(
+                "RECONCILIATION_REQUIRED",
+                "이미지 컨테이너 요청 결과가 불명확합니다. Meta 결과를 대조한 뒤 다시 승인하세요.",
+                409,
+              );
+            await mutateWorkspace(
+              actorId,
+              "INSTAGRAM_CHILD_RESERVED",
+              entityId,
+              (draft) => {
+                if (
+                  draft.audit.some(
+                    (a) =>
+                      a.entityId === entityId &&
+                      a.action === "INSTAGRAM_CHILD_REQUESTED",
+                  )
+                )
+                  throw new ServiceError(
+                    "RECONCILIATION_REQUIRED",
+                    "이미지 요청이 이미 진행 중입니다.",
+                    409,
+                  );
+                draft.audit.push({
+                  id: randomUUID(),
+                  actorId,
+                  entityId,
+                  action: "INSTAGRAM_CHILD_REQUESTED",
+                  at: new Date().toISOString(),
+                  details: `Image ${index + 1}`,
+                });
+              },
+            );
+            const child = await officialApi<{ id: string }>(
+              `${base}/${encodeURIComponent(channel.platformAccountId)}/media`,
+              {
+                token,
+                method: "POST",
+                body: { image_url: mediaUrls[index], is_carousel_item: true },
+              },
+            );
+            if (!child.id)
+              throw new ServiceError(
+                "API_OUTCOME_UNKNOWN",
+                "Meta 이미지 컨테이너 ID를 받지 못했습니다.",
+                502,
+              );
+            id = child.id;
+            await mutateWorkspace(
+              actorId,
+              "INSTAGRAM_CHILD_RECORDED",
+              entityId,
+              (draft) => {
+                draft.audit.push({
+                  id: randomUUID(),
+                  actorId,
+                  entityId,
+                  action: "INSTAGRAM_CHILD_CREATED",
+                  at: new Date().toISOString(),
+                  details: child.id,
+                });
+              },
+            );
+          }
+          const state = await officialApi<{ status_code?: string }>(
+            `${base}/${encodeURIComponent(id)}?fields=status_code`,
+            { token },
+          );
+          if (["ERROR", "EXPIRED"].includes(state.status_code ?? ""))
+            throw new ServiceError(
+              "CONTAINER_FAILED",
+              "캐러셀 이미지 처리에 실패했습니다. 이미지 규격과 주소를 확인하세요.",
+            );
+          if (state.status_code !== "FINISHED")
+            throw new ServiceError(
+              "CONTAINER_PROCESSING",
+              "Meta에서 이미지를 처리 중입니다. 기존 컨테이너를 다시 확인합니다.",
+              409,
+            );
+          children.push(id);
+        }
+        const latest = await getWorkspaceData();
+        if (
+          latest.audit.some(
+            (a) =>
+              a.entityId === publicationId &&
+              a.action === "INSTAGRAM_PARENT_REQUESTED",
+          )
+        )
+          throw new ServiceError(
+            "RECONCILIATION_REQUIRED",
+            "캐러셀 컨테이너 요청이 이미 전달되었습니다. Meta 결과를 확인하세요.",
+            409,
+          );
+        await mutateWorkspace(
+          actorId,
+          "INSTAGRAM_PARENT_RESERVED",
+          publicationId,
+          (draft) => {
+            if (
+              draft.audit.some(
+                (a) =>
+                  a.entityId === publicationId &&
+                  a.action === "INSTAGRAM_PARENT_REQUESTED",
+              )
+            )
+              throw new ServiceError(
+                "RECONCILIATION_REQUIRED",
+                "캐러셀 요청이 이미 진행 중입니다.",
+                409,
+              );
+            draft.audit.push({
+              id: randomUUID(),
+              actorId,
+              action: "INSTAGRAM_PARENT_REQUESTED",
+              entityId: publicationId,
+              at: new Date().toISOString(),
+              details: "Ordered carousel children reserved",
+            });
+          },
+        );
+      }
       const response = await officialApi<{ id: string }>(
         `${base}/${encodeURIComponent(channel.platformAccountId)}/media`,
         {
           token,
           method: "POST",
-          body: {
-            media_type: "REELS",
-            video_url: publication.mediaUrl,
-            caption: publication.caption,
-            share_to_feed: true,
-          },
+          body:
+            project.format === "CAROUSEL"
+              ? {
+                  media_type: "CAROUSEL",
+                  children,
+                  caption: publication.caption,
+                }
+              : {
+                  media_type: "REELS",
+                  video_url: publication.mediaUrl,
+                  caption: publication.caption,
+                  share_to_feed: true,
+                },
         },
       );
       if (!response.id)

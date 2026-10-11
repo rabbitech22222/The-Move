@@ -15,13 +15,14 @@ const referenceDesigns = new Set([
 type Dataset = Record<string, { type: string }>;
 export type CanvaField =
   | { type: "text"; text: string }
-  | { type: "image"; asset_id: string };
+  | { type: "image" | "video"; asset_id: string };
 export interface CanvaGenerationOptions {
   fields?: Record<string, CanvaField>;
   pageCount?: number;
 }
 interface TemplateBinding {
-  brandTemplateId: string;
+  brandTemplateId?: string;
+  designId?: string;
   pageCount?: number;
 }
 interface AutofillJob {
@@ -42,6 +43,12 @@ function bindingFor(template: CanvaTemplate): TemplateBinding | null {
     );
   }
   const binding =
+    (template.configuration?.brandTemplateId
+      ? {
+          brandTemplateId: template.configuration.brandTemplateId,
+          pageCount: template.configuration.pageCount,
+        }
+      : undefined) ??
     config[template.designId] ??
     process.env[`CANVA_BRAND_TEMPLATE_${template.designId}`];
   return typeof binding === "string"
@@ -74,6 +81,14 @@ export function validateTemplate(
       "Select the approved Canva reference belonging to the assigned operator.",
     );
   }
+  if (
+    project.channelId === "the-move" &&
+    !referenceDesigns.has(template.designId)
+  )
+    throw new ServiceError(
+      "TEMPLATE_NOT_APPROVED",
+      "THE MOVE는 지정된 실제 원본만 사용할 수 있습니다. 릴스는 DAHPcvVkH8k만 사용하세요.",
+    );
   if (project.format === "REEL") {
     if (
       template.width !== 1080 ||
@@ -103,7 +118,7 @@ export function validateCopyLayout(fields: Record<string, CanvaField>): void {
         "EMPTY_FIELD",
         `Canva text field ${name} must not be empty.`,
       );
-    const headline = /headline|title/i.test(name);
+    const headline = /headline|title|제목|헤드라인/i.test(name);
     const maxLength = headline ? 110 : 900;
     const maxLines = headline ? 4 : 22;
     if (
@@ -123,21 +138,33 @@ async function datasetFor(
   token: string,
 ): Promise<{ binding: TemplateBinding; dataset: Dataset }> {
   const binding = bindingFor(template);
-  if (!binding?.brandTemplateId)
-    throw new ServiceError(
-      "SETUP_REQUIRED",
-      `Reference ${template.designId} is a design ID, not an autofill brand template ID. Duplicate the reference without editing it, publish an approved Brand Template, add dataset fields in Canva, and configure CANVA_BRAND_TEMPLATE_MAP. Canva Enterprise/autofill access may be required.`,
-    );
+  const selected: TemplateBinding = binding?.brandTemplateId
+    ? binding
+    : { designId: template.designId };
+  if (selected.designId) {
+    const source = await officialApi<{
+      design: { id: string; page_count?: number };
+    }>(`${CANVA}/designs/${encodeURIComponent(selected.designId)}`, { token });
+    if (source.design.id !== selected.designId)
+      throw new ServiceError(
+        "INVALID_API_RESPONSE",
+        "Canva 원본 디자인 ID가 일치하지 않습니다.",
+        502,
+      );
+    selected.pageCount = source.design.page_count;
+  }
   const response = await officialApi<{ dataset: Dataset }>(
-    `${CANVA}/brand-templates/${encodeURIComponent(binding.brandTemplateId)}/dataset`,
+    selected.brandTemplateId
+      ? `${CANVA}/brand-templates/${encodeURIComponent(selected.brandTemplateId)}/dataset`
+      : `${CANVA}/designs/${encodeURIComponent(selected.designId!)}/dataset`,
     { token },
   );
   if (!response.dataset || !Object.keys(response.dataset).length)
     throw new ServiceError(
       "SETUP_REQUIRED",
-      "The selected Brand Template has no autofill dataset. Add and name supported text/image fields in Canva before generating.",
+      "실제 원본에 자동 채우기 필드가 없습니다. 원본을 변경하지 말고 새 사본에서 제목·본문·미디어·출처 필드를 설정해 승인된 브랜드 템플릿으로 연결하세요.",
     );
-  return { binding, dataset: response.dataset };
+  return { binding: selected, dataset: response.dataset };
 }
 
 export async function inspectCanvaTemplate(
@@ -161,18 +188,41 @@ export async function inspectCanvaTemplate(
     );
   try {
     // Read only; source designs are never updated, resized, exported, or overwritten.
-    await officialApi<{ design: { id: string } }>(
-      `${CANVA}/designs/${encodeURIComponent(template.designId)}`,
-      { token },
+    const source = await officialApi<{
+      design: {
+        id: string;
+        title?: string;
+        thumbnail?: { url: string };
+        page_count?: number;
+      };
+    }>(`${CANVA}/designs/${encodeURIComponent(template.designId)}`, { token });
+    await mutateWorkspace(
+      actorId,
+      "CANVA_REFERENCE_READ",
+      templateId,
+      (draft) => {
+        const target = draft.templates.find((t) => t.id === templateId)!;
+        target.configuration = {
+          ...target.configuration,
+          previewUrl: source.design.thumbnail?.url,
+          sourceTitle: source.design.title,
+          ...(!template.configuration?.brandTemplateId &&
+          source.design.page_count
+            ? { pageCount: source.design.page_count }
+            : {}),
+        };
+        target.inspectedAt = new Date().toISOString();
+      },
     );
-    const { dataset } = await datasetFor(template, token);
-    const status =
-      template.format === "REEL" ||
-      Object.values(dataset).some(
-        (field) => !["text", "image"].includes(field.type),
-      )
-        ? "SETUP_REQUIRED"
-        : "READY";
+    const { binding: inspectedBinding, dataset } = await datasetFor(
+      template,
+      token,
+    );
+    const status = Object.values(dataset).some(
+      (field) => !["text", "image", "video"].includes(field.type),
+    )
+      ? "SETUP_REQUIRED"
+      : "READY";
     const snapshot = await mutateWorkspace(
       actorId,
       "CANVA_TEMPLATE_INSPECTED",
@@ -180,6 +230,17 @@ export async function inspectCanvaTemplate(
       (draft) => {
         const target = draft.templates.find((t) => t.id === templateId)!;
         target.fields = Object.keys(dataset);
+        target.configuration = {
+          ...target.configuration,
+          fieldTypes: Object.fromEntries(
+            Object.entries(dataset).map(([name, field]) => [name, field.type]),
+          ),
+          previewUrl: source.design.thumbnail?.url,
+          sourceTitle: source.design.title,
+          ...(inspectedBinding.pageCount
+            ? { pageCount: inspectedBinding.pageCount }
+            : {}),
+        };
         target.inspectedAt = new Date().toISOString();
         target.status = status;
       },
@@ -206,11 +267,11 @@ function inferredFields(
   const result: Record<string, CanvaField> = {};
   for (const [name, field] of Object.entries(dataset)) {
     if (field.type !== "text") continue;
-    if (/^(headline|title)$/i.test(name))
+    if (/^(headline|title|제목|헤드라인)$/i.test(name))
       result[name] = { type: "text", text: project.title };
-    if (/^(body|copy|caption)$/i.test(name))
+    if (/^(body|copy|caption|본문|캡션)$/i.test(name))
       result[name] = { type: "text", text: project.draftCopy };
-    if (/^(source_credit|sources|credit)$/i.test(name))
+    if (/^(source_credit|sources|credit|출처)$/i.test(name))
       result[name] = { type: "text", text: project.sourceUrls.join("\n") };
   }
   return result;
@@ -232,15 +293,16 @@ export async function generateCanvaDesign(
       404,
     );
   validateTemplate(template, project);
+  if (!["DESIGN", "REVIEW"].includes(project.stage))
+    throw new ServiceError(
+      "INVALID_STAGE",
+      "디자인·검토 단계의 프로젝트만 새 Canva 디자인을 생성할 수 있습니다.",
+      409,
+    );
   if (!project.draftCopy.trim() || !project.sourceUrls.length)
     throw new ServiceError(
       "RESEARCH_REQUIRED",
       "Add draft copy and research source references before Canva production.",
-    );
-  if (project.format === "REEL")
-    throw new ServiceError(
-      "SETUP_REQUIRED",
-      `Canva Autofill does not support video dataset replacement. Open reference ${THE_MOVE_REEL_DESIGN}, use Make a copy, keep the 1080 × 1920 canvas and landscape-video frame/aspect ratio, replace headline/video, add source credit, and submit the new editable design for human review. Do not modify the reference.`,
     );
   const token = await getIntegrationToken("canva");
   if (!token)
@@ -257,21 +319,26 @@ export async function generateCanvaDesign(
     );
   const fields = { ...inferredFields(project, dataset), ...options.fields };
   for (const [name, field] of Object.entries(dataset)) {
-    if (!["text", "image"].includes(field.type))
+    if (!["text", "image", "video"].includes(field.type))
       throw new ServiceError(
         "UNSUPPORTED_FIELD",
         `Dataset field ${name} (${field.type}) requires a manual Canva workflow.`,
       );
-    if (!fields[name] || fields[name].type !== field.type)
+    if (
+      !fields[name] ||
+      !(
+        fields[name].type === field.type ||
+        (field.type === "image" &&
+          fields[name].type === "video" &&
+          project.format === "REEL")
+      )
+    )
       throw new ServiceError(
         "MISSING_CANVA_FIELD",
         `Provide ${field.type} data for dataset field ${name}. Images require an authorized, existing Canva asset ID; no placeholder asset is generated.`,
       );
     const value = fields[name];
-    if (
-      value.type === "image" &&
-      !/^[A-Za-z0-9_-]{1,200}$/.test(value.asset_id)
-    )
+    if (value.type !== "text" && !/^[A-Za-z0-9_-]{1,200}$/.test(value.asset_id))
       throw new ServiceError(
         "INVALID_ASSET",
         `Dataset image field ${name} requires an existing authorized Canva asset ID.`,
@@ -326,7 +393,12 @@ export async function generateCanvaDesign(
         method: "POST",
         token,
         body: {
-          brand_template_id: binding.brandTemplateId,
+          ...(binding.brandTemplateId
+            ? {
+                type: "create_from_brand_template",
+                brand_template_id: binding.brandTemplateId,
+              }
+            : { type: "create_from_design", design_id: template.designId }),
           title: project.title.slice(0, 255),
           data: fields,
         },
@@ -422,12 +494,21 @@ export async function refreshCanvaDesign(
         target.editUrl = editUrl;
         target.error = null;
         const project = draft.projects.find((p) => p.id === target.projectId)!;
+        if (["SCHEDULED", "PUBLISHED"].includes(project.stage))
+          throw new ServiceError(
+            "PROJECT_LOCKED",
+            "예약·게시된 프로젝트에는 새 디자인을 적용할 수 없습니다.",
+            409,
+          );
+        draft.approvals = draft.approvals.filter(
+          (a) => a.projectId !== project.id,
+        );
         project.stage = "REVIEW";
         project.updatedAt = new Date().toISOString();
         project.revisions.push({
           at: project.updatedAt,
           actorId,
-          note: "New Canva design received; human review required. Instagram publishing remains separate.",
+          note: "새 Canva 디자인을 받았습니다. 사람의 검토가 필요하며 Instagram 게시 승인은 별도입니다.",
         });
       }
     },
@@ -546,7 +627,7 @@ export async function registerManualDesign(
         editUrl: link.url,
         externalId: link.designId,
         error:
-          "Operator-submitted copy. Canva API generation, page count, layout and ownership are not verified; visual human review is required.",
+          "운영자가 등록한 사본입니다. Canva API 생성, 페이지 수, 디자인과 소유권은 확인되지 않았습니다. 사람이 직접 검토해야 합니다.",
         createdAt: now,
       };
       data.designs.unshift(result);
@@ -555,10 +636,291 @@ export async function registerManualDesign(
       project.revisions.push({
         at: now,
         actorId,
-        note: `Manual Canva copy submitted for visual review: ${link.designId}, operator-reported ${input.pageCount} page(s), ${template.width} × ${template.height} reference. No API success claimed.`,
+        note: `Canva 사본 검토 요청: ${link.designId}, 운영자가 확인한 ${input.pageCount}페이지, ${template.width} × ${template.height} 원본. API 생성 성공으로 표시하지 않습니다.`,
       });
       data.approvals = data.approvals.filter((a) => a.projectId !== projectId);
     },
   );
   return result!;
+}
+
+/** Human attestation maps a preserved working copy; API inspection verifies field types, not pixel equality. */
+export async function configureCanvaTemplate(
+  templateId: string,
+  brandTemplateId: string,
+  pageCount: number,
+  actorId: string,
+) {
+  if (
+    !/^[A-Za-z0-9_-]{1,200}$/.test(brandTemplateId) ||
+    !Number.isInteger(pageCount) ||
+    pageCount < 1 ||
+    pageCount > 30
+  )
+    throw new ServiceError(
+      "INVALID_CONFIGURATION",
+      "올바른 브랜드 템플릿 ID와 페이지 수를 입력하세요.",
+    );
+  await mutateWorkspace(
+    actorId,
+    "CANVA_BINDING_HUMAN_CONFIRMED",
+    templateId,
+    (draft) => {
+      const template = draft.templates.find((t) => t.id === templateId);
+      if (!template || !referenceDesigns.has(template.designId))
+        throw new ServiceError(
+          "NOT_FOUND",
+          "승인된 실제 원본을 선택하세요.",
+          404,
+        );
+      if (template.format === "REEL" && pageCount !== 1)
+        throw new ServiceError(
+          "INVALID_CONFIGURATION",
+          "릴스 템플릿은 1페이지여야 합니다.",
+          409,
+        );
+      template.configuration = { brandTemplateId, pageCount };
+      template.status = "UNINSPECTED";
+      template.fields = [];
+      template.inspectedAt = null;
+    },
+  );
+  return inspectCanvaTemplate(templateId, actorId);
+}
+
+type ExportJob = {
+  id: string;
+  status: "in_progress" | "success" | "failed";
+  urls?: string[];
+  error?: { code?: string };
+};
+/** Exports a new reviewed copy, never one of the protected original designs. */
+export async function exportCanvaDesign(
+  designId: string,
+  actorId: string,
+  refresh = false,
+) {
+  const data = await getWorkspaceData();
+  const design = data.designs.find((d) => d.id === designId);
+  const project = data.projects.find((p) => p.id === design?.projectId);
+  if (
+    !design ||
+    !project ||
+    !design.externalId ||
+    !["READY", "MANUAL_REVIEW"].includes(design.status) ||
+    referenceDesigns.has(design.externalId)
+  )
+    throw new ServiceError(
+      "DESIGN_REQUIRED",
+      "원본이 아닌 새 Canva 디자인을 먼저 생성하거나 사본을 등록하세요.",
+      409,
+    );
+  if (!["DESIGN", "REVIEW"].includes(project.stage))
+    throw new ServiceError(
+      "REVIEW_REQUIRED",
+      "내보내기는 디자인·검토 단계에서 진행합니다. 승인된 프로젝트는 검토로 되돌려 새 파일을 검토하세요.",
+      409,
+    );
+  const token = await getIntegrationToken("canva");
+  if (!token)
+    throw new ServiceError(
+      "DISCONNECTED",
+      "Canva 디자인 읽기 권한으로 계정을 연결하세요.",
+      409,
+    );
+  let ids: string[] = [];
+  const jobs: ExportJob[] = [];
+  if (refresh) {
+    if (!design.exportJobId)
+      throw new ServiceError(
+        "RECONCILIATION_REQUIRED",
+        "확인할 내보내기 작업이 없습니다.",
+        409,
+      );
+    try {
+      ids = JSON.parse(design.exportJobId);
+    } catch {
+      ids = [design.exportJobId];
+    }
+    if (
+      !Array.isArray(ids) ||
+      ids.some((id) => typeof id !== "string" || id === "pending")
+    )
+      throw new ServiceError(
+        "RECONCILIATION_REQUIRED",
+        "내보내기 요청 결과가 불명확합니다. Canva에서 확인하고 새 사본을 검토하세요.",
+        409,
+      );
+    for (const id of ids) {
+      const response = await officialApi<{ job: ExportJob }>(
+        `${CANVA}/exports/${encodeURIComponent(id)}`,
+        { token },
+      );
+      jobs.push(response.job);
+    }
+  } else {
+    const metadata = await officialApi<{
+      design: { id: string; page_count?: number };
+    }>(`${CANVA}/designs/${encodeURIComponent(design.externalId)}`, { token });
+    if (metadata.design.id !== design.externalId)
+      throw new ServiceError(
+        "INVALID_API_RESPONSE",
+        "Canva 디자인 ID가 요청한 사본과 일치하지 않습니다.",
+        502,
+      );
+    const pageCount = metadata.design.page_count;
+    if (
+      !pageCount ||
+      !Number.isInteger(pageCount) ||
+      pageCount < 1 ||
+      pageCount > (project.format === "REEL" ? 1 : 10)
+    )
+      throw new ServiceError(
+        "PAGE_COUNT_REQUIRED",
+        "Instagram 게시용 캐러셀은 2~10페이지, 릴스는 1페이지여야 합니다. Canva에서 페이지 수를 확인하세요.",
+        409,
+      );
+    if (project.format === "CAROUSEL" && pageCount < 2)
+      throw new ServiceError(
+        "PAGE_COUNT_REQUIRED",
+        "캐러셀에는 최소 2페이지가 필요합니다.",
+        409,
+      );
+    await mutateWorkspace(
+      actorId,
+      "CANVA_EXPORT_REQUESTED",
+      designId,
+      (draft) => {
+        const target = draft.designs.find((d) => d.id === designId)!;
+        if (target.exportJobId)
+          throw new ServiceError(
+            "EXPORT_ALREADY_REQUESTED",
+            "내보내기 요청이 이미 있습니다. 결과 확인을 눌러주세요. 만료된 파일은 새 사본으로 다시 검토하세요.",
+            409,
+          );
+        target.exportJobId = JSON.stringify(["pending"]);
+        target.exportUrls = [];
+        draft.approvals = draft.approvals.filter(
+          (a) => a.projectId !== project.id,
+        );
+      },
+    );
+    // A separate page export avoids ZIP archives and preserves the exact page order.
+    for (let page = 1; page <= pageCount; page++) {
+      const response = await officialApi<{ job: ExportJob }>(
+        `${CANVA}/exports`,
+        {
+          token,
+          method: "POST",
+          body: {
+            design_id: design.externalId,
+            format:
+              project.format === "REEL"
+                ? { type: "mp4", quality: "vertical_1080p", pages: [1] }
+                : {
+                    type: "png",
+                    width: 1080,
+                    height: 1350,
+                    pages: [page],
+                    export_quality: "regular",
+                  },
+          },
+        },
+      );
+      const job = response.job;
+      if (
+        !job?.id ||
+        !["in_progress", "success", "failed"].includes(job.status)
+      )
+        throw new ServiceError(
+          "API_OUTCOME_UNKNOWN",
+          "Canva 내보내기 결과가 불명확합니다. 성공으로 기록하지 않았습니다.",
+          502,
+        );
+      ids.push(job.id);
+      jobs.push(job);
+      await mutateWorkspace(
+        actorId,
+        "CANVA_PAGE_EXPORT_ACCEPTED",
+        designId,
+        (draft) => {
+          draft.designs.find((d) => d.id === designId)!.exportJobId =
+            JSON.stringify(page < pageCount ? [...ids, "pending"] : ids);
+        },
+      );
+    }
+  }
+  if (
+    jobs.some(
+      (job) =>
+        !job?.id || !["in_progress", "success", "failed"].includes(job.status),
+    )
+  )
+    throw new ServiceError(
+      "INVALID_API_RESPONSE",
+      "Canva 작업 상태를 확인할 수 없습니다.",
+      502,
+    );
+  const status = jobs.some((job) => job.status === "failed")
+    ? "failed"
+    : jobs.every((job) => job.status === "success")
+      ? "success"
+      : "in_progress";
+  const urls =
+    status === "success"
+      ? jobs.map((job) => {
+          if (job.urls?.length !== 1)
+            throw new ServiceError(
+              "INVALID_API_RESPONSE",
+              "페이지별 파일 주소를 확인하지 못했습니다. Canva에서 직접 내보낸 이미지 주소를 사용하세요.",
+              502,
+            );
+          const url = job.urls[0];
+          try {
+            const parsed = new URL(url);
+            if (
+              parsed.protocol !== "https:" ||
+              parsed.username ||
+              parsed.password ||
+              /\.zip$/i.test(parsed.pathname)
+            )
+              throw new Error();
+          } catch {
+            throw new ServiceError(
+              "INVALID_API_RESPONSE",
+              "올바른 공개 HTTPS 미디어 주소가 아닙니다.",
+              502,
+            );
+          }
+          return url;
+        })
+      : [];
+  const result = await mutateWorkspace(
+    actorId,
+    "CANVA_EXPORT_STATUS_CONFIRMED",
+    designId,
+    (draft) => {
+      const target = draft.designs.find((d) => d.id === designId)!;
+      target.exportJobId = JSON.stringify(ids);
+      target.exportUrls = urls ?? [];
+      target.error =
+        status === "failed"
+          ? `Canva 내보내기 실패 (${jobs.find((job) => job.status === "failed")?.error?.code ?? "unknown"}). 이용 권한 및 유료 요소를 확인하세요.`
+          : null;
+      if (status === "success") {
+        const current = draft.projects.find((p) => p.id === project.id)!;
+        current.stage = "REVIEW";
+        current.updatedAt = new Date().toISOString();
+        current.revisions.push({
+          at: current.updatedAt,
+          actorId,
+          note: "Canva 내보내기 파일을 받았습니다. 파일 내용·순서·브랜드·출처를 확인하고 편집 및 게시를 각각 승인하세요. 다운로드 주소는 만료될 수 있습니다.",
+        });
+        draft.approvals = draft.approvals.filter(
+          (a) => a.projectId !== project.id,
+        );
+      }
+    },
+  );
+  return result.designs.find((d) => d.id === designId)!;
 }

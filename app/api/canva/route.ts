@@ -5,11 +5,25 @@ import {
   inspectCanvaTemplate,
   refreshCanvaDesign,
   registerManualDesign,
+  configureCanvaTemplate,
+  exportCanvaDesign,
 } from "@/lib/services/canva";
 import { enqueueTask } from "@/lib/jobs";
 const schema = z.object({
-  action: z.enum(["inspect", "generate", "refresh", "register-manual"]),
+  action: z.enum([
+    "inspect",
+    "generate",
+    "refresh",
+    "register-manual",
+    "configure",
+    "export",
+    "refresh-export",
+  ]),
   templateId: z.string().optional(),
+  brandTemplateId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,200}$/)
+    .optional(),
   projectId: z.string().optional(),
   designId: z.string().optional(),
   editUrl: z.url().optional(),
@@ -21,7 +35,7 @@ const schema = z.object({
       z.discriminatedUnion("type", [
         z.object({ type: z.literal("text"), text: z.string().min(1).max(900) }),
         z.object({
-          type: z.literal("image"),
+          type: z.enum(["image", "video"]),
           asset_id: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/),
         }),
       ]),
@@ -32,7 +46,43 @@ export async function POST(request: Request) {
   return endpoint(async () => {
     const user = await authorize(request, true),
       input = await body(request, schema);
-    if (input.action === "register-manual") {
+    if (input.action === "configure") {
+      if (user.role !== "ADMIN")
+        throw new HttpError(
+          403,
+          "FORBIDDEN",
+          "템플릿 설정은 관리자만 변경할 수 있습니다.",
+        );
+      if (
+        !input.templateId ||
+        !input.brandTemplateId ||
+        !input.pageCount ||
+        !input.preservedLayout
+      )
+        throw new HttpError(
+          400,
+          "TEMPLATE_REQUIRED",
+          "원본 사본의 브랜드 템플릿 ID, 페이지 수와 디자인 유지 확인이 필요합니다.",
+        );
+      await configureCanvaTemplate(
+        input.templateId,
+        input.brandTemplateId,
+        input.pageCount,
+        user.id,
+      );
+    } else if (input.action === "export" || input.action === "refresh-export") {
+      if (!input.designId)
+        throw new HttpError(
+          400,
+          "DESIGN_REQUIRED",
+          "내보낼 새 디자인을 선택하세요.",
+        );
+      await exportCanvaDesign(
+        input.designId,
+        user.id,
+        input.action === "refresh-export",
+      );
+    } else if (input.action === "register-manual") {
       if (
         !input.projectId ||
         !input.templateId ||

@@ -1,3 +1,4 @@
+import { koreanError } from "./korean";
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { getSession, canWrite } from "@/lib/auth";
@@ -68,7 +69,9 @@ export async function endpoint(fn: () => Promise<Response>): Promise<Response> {
       return NextResponse.json(
         {
           error: e.issues
-            .map((i) => `${i.path.join(".")}: ${i.message}`)
+            .map(
+              (i) => `${i.path.join(".")}: 입력 값의 형식과 범위를 확인하세요`,
+            )
             .join("; "),
           code: "VALIDATION",
         },
@@ -76,12 +79,12 @@ export async function endpoint(fn: () => Promise<Response>): Promise<Response> {
       );
     if (e instanceof HttpError)
       return NextResponse.json(
-        { error: e.message, code: e.code },
+        { error: koreanError(e.code, e.message), code: e.code },
         { status: e.status },
       );
     if (e instanceof Error && "code" in e && typeof e.code === "string")
       return NextResponse.json(
-        { error: e.message, code: e.code },
+        { error: koreanError(e.code, e.message), code: e.code },
         {
           status:
             "status" in e && typeof e.status === "number" ? e.status : 422,
@@ -93,8 +96,7 @@ export async function endpoint(fn: () => Promise<Response>): Promise<Response> {
     );
     return NextResponse.json(
       {
-        error:
-          "The operation could not complete. Check server logs and configuration.",
+        error: "작업을 완료하지 못했습니다. 서버 로그와 설정을 확인하세요.",
         code: "INTERNAL_ERROR",
       },
       { status: 500 },

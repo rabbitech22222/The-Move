@@ -1,4 +1,5 @@
 "use client";
+import { koreanLabel } from "@/lib/korean";
 
 import { useMemo, useState } from "react";
 import { Check, FlaskConical, Lightbulb, Sparkles, X } from "lucide-react";
@@ -32,7 +33,7 @@ import type { PostMetric, Recommendation } from "@/lib/domain";
 const number = (value: number | null) =>
   value === null
     ? "—"
-    : new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
+    : new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(
         value,
       );
 const median = (values: number[]) => {
@@ -196,7 +197,7 @@ export function Analytics() {
         .map((o) => o.rate)
         .filter((r): r is number => r !== null);
       return {
-        name: format.charAt(0) + format.slice(1).toLowerCase(),
+        name: koreanLabel(format),
         rate: median(rates),
         sample: rates.length,
         total: rows.length,
@@ -283,9 +284,7 @@ export function Analytics() {
     } catch (err) {
       setNotice({
         text:
-          err instanceof Error
-            ? err.message
-            : "The action could not be completed.",
+          err instanceof Error ? err.message : "작업을 완료하지 못했습니다.",
         failed: true,
       });
       return false;
@@ -300,21 +299,20 @@ export function Analytics() {
     <div className="space-y-6">
       <header className="page-header">
         <div>
-          <p className="eyebrow">MEASURE / LEARN / IMPROVE</p>
-          <h1 className="page-title">Analytics</h1>
+          <p className="eyebrow">측정 / 학습 / 개선</p>
+          <h1 className="page-title">분석</h1>
           <p className="mt-2 muted">
-            Understand what resonates. Turn observations into considered
-            experiments.
+            성과를 살펴보고 근거를 바탕으로 개선 실험을 제안합니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <select
             className="select !w-auto"
-            aria-label="Analytics channel"
+            aria-label="분석할 채널"
             value={channelId}
             onChange={(e) => setChannelId(e.target.value)}
           >
-            <option value="all">All channels</option>
+            <option value="all">전체 채널</option>
             {data.channels.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -323,21 +321,21 @@ export function Analytics() {
           </select>
           <select
             className="select !w-auto"
-            aria-label="Analytics reporting period"
+            aria-label="분석 기간"
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
           >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="custom">Custom period</option>
+            <option value="7">최근 7일</option>
+            <option value="30">최근 30일</option>
+            <option value="90">최근 90일</option>
+            <option value="custom">직접 기간 선택</option>
           </select>
         </div>
       </header>
       {period === "custom" && (
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-xs muted">
-            From
+            시작일
             <input
               className="input"
               type="date"
@@ -346,7 +344,7 @@ export function Analytics() {
             />
           </label>
           <label className="flex items-center gap-2 text-xs muted">
-            To
+            종료일
             <input
               className="input"
               type="date"
@@ -356,28 +354,28 @@ export function Analytics() {
           </label>
           {invalidRange && (
             <p className="text-xs text-red-600" role="alert">
-              The start date must be on or before the end date.
+              시작일은 종료일보다 늦을 수 없습니다.
             </p>
           )}
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] muted">
         <p className="flex items-center gap-2">
-          <Badge>{data.demo ? "DEMO METRICS" : "META / STORED METRICS"}</Badge>
+          <Badge>{data.demo ? "예시 지표" : "Meta / 저장된 지표"}</Badge>
           {computed.from} — {computed.to}
-          {period !== "custom" && " · through latest available snapshot"}
+          {period !== "custom" && " · 최근 저장된 기록까지"}
         </p>
         <p>
-          Last sync:{" "}
+          마지막 동기화:{" "}
           {computed.lastSync
-            ? new Date(computed.lastSync).toLocaleString("en-US", {
+            ? new Date(computed.lastSync).toLocaleString("ko-KR", {
                 timeZone: "Asia/Seoul",
                 month: "short",
                 day: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
-              }) + " KST"
-            : "No synchronized data"}
+              }) + " 한국 표준시"
+            : "동기화된 데이터 없음"}
         </p>
       </div>
       {notice && (
@@ -390,39 +388,39 @@ export function Analytics() {
       )}
       <div className="grid gap-4 sm:grid-cols-3">
         <Metric
-          label="FOLLOWER CHANGE"
+          label="팔로워 변화"
           value={
             computed.totalGrowth === null
               ? "—"
               : `${computed.totalGrowth > 0 ? "+" : ""}${number(computed.totalGrowth)}`
           }
-          description={`${computed.growthChannels} of ${computed.channels.length} channels with comparable snapshots`}
+          description={`${computed.channels.length}개 채널 중 비교 가능한 기록이 있는 ${computed.growthChannels}개`}
         />
         <Metric
-          label="MEDIAN ENGAGEMENT / REACH"
+          label="도달 대비 반응 중앙값"
           value={
             computed.medianRate === null
               ? "—"
               : `${computed.medianRate.toFixed(2)}%`
           }
-          description={`${computed.rates.length} posts with complete interaction and reach data`}
+          description={`반응·도달 지표가 완전한 게시물 ${computed.rates.length}개`}
         />
         <Metric
-          label="MEDIAN PRODUCTION TIME"
+          label="제작 시간 중앙값"
           value={
             computed.production === null
               ? "—"
-              : `${number(computed.production)} min`
+              : `${number(computed.production)}분`
           }
-          description={`${computed.timedCount} published projects with recorded time`}
+          description={`제작 시간이 기록된 게시 완료 프로젝트 ${computed.timedCount}개`}
         />
       </div>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <section className="panel min-w-0">
           <div className="panel-header !block">
-            <h2 className="font-semibold">Follower growth</h2>
+            <h2 className="font-semibold">팔로워 추이</h2>
             <p className="mt-1 text-xs muted">
-              Daily stored snapshots. Missing days remain gaps.
+              저장된 일별 기록입니다. 기록이 없는 날짜는 비워 둡니다.
             </p>
           </div>
           <div className="h-72 p-4">
@@ -483,17 +481,17 @@ export function Analytics() {
               </ResponsiveContainer>
             ) : (
               <Empty
-                title="A growth line needs two snapshots"
-                detail="Synchronize authorized account metrics to begin comparing daily changes."
+                title="추이를 보려면 기록이 2개 이상 필요합니다"
+                detail="인증된 계정의 지표를 동기화하면 일별 변화를 비교할 수 있습니다."
               />
             )}
           </div>
         </section>
         <section className="panel min-w-0">
           <div className="panel-header !block">
-            <h2 className="font-semibold">Format performance</h2>
+            <h2 className="font-semibold">형식별 성과</h2>
             <p className="mt-1 text-xs muted">
-              Median engagement / reached account, by format.
+              콘텐츠 형식별 도달 대비 반응의 중앙값입니다.
             </p>
           </div>
           <div className="h-72 p-4">
@@ -524,7 +522,7 @@ export function Analytics() {
                     contentStyle={tooltipStyle}
                     formatter={(value) => [
                       `${Number(value).toFixed(2)}%`,
-                      "Median engagement / reach",
+                      "도달 대비 반응 중앙값",
                     ]}
                   />
                   <Bar
@@ -538,8 +536,8 @@ export function Analytics() {
               </ResponsiveContainer>
             ) : (
               <Empty
-                title="No comparable format metrics"
-                detail="Complete likes, comments, saves, shares and reach are required."
+                title="비교할 형식별 지표 없음"
+                detail="좋아요·댓글·저장·공유·도달 지표가 모두 필요합니다."
               />
             )}
           </div>
@@ -547,29 +545,28 @@ export function Analytics() {
             {computed.formats
               .map((f) => `${f.name}: n=${f.sample}`)
               .join(" · ")}
-            . Latest post snapshots; post ages may differ.
+            . 게시물별 최신 기록이며 게시 후 경과 시간이 다를 수 있습니다.
           </p>
         </section>
       </div>
       <section className="panel">
         <div className="panel-header !block">
-          <h2 className="font-semibold">Compare channels fairly</h2>
+          <h2 className="font-semibold">채널 규모를 고려한 비교</h2>
           <p className="mt-1 text-xs muted">
-            Relative follower growth and engagement per reach reduce the effect
-            of account size.
+            팔로워 증가율과 도달 대비 반응으로 계정 규모 차이를 고려합니다.
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="data-table w-full">
             <thead>
               <tr>
-                <th className="text-left">Channel</th>
-                <th className="text-right">Followers</th>
-                <th className="text-right">Growth</th>
-                <th className="text-right">Relative growth</th>
-                <th className="text-right">Median engagement / reach</th>
-                <th className="text-right">Complete posts</th>
-                <th className="text-right">Median production</th>
+                <th className="text-left">채널</th>
+                <th className="text-right">팔로워</th>
+                <th className="text-right">증감</th>
+                <th className="text-right">증가율</th>
+                <th className="text-right">도달 대비 반응 중앙값</th>
+                <th className="text-right">지표가 완전한 게시물</th>
+                <th className="text-right">제작 시간 중앙값</th>
               </tr>
             </thead>
             <tbody>
@@ -604,9 +601,7 @@ export function Analytics() {
                   </td>
                   <td className="text-right tabular-nums">{s.sampleSize}</td>
                   <td className="text-right tabular-nums">
-                    {s.production === null
-                      ? "—"
-                      : `${number(s.production)} min`}
+                    {s.production === null ? "—" : `${number(s.production)}분`}
                     <p className="mt-1 text-[10px] muted">n={s.timedCount}</p>
                   </td>
                 </tr>
@@ -618,9 +613,9 @@ export function Analytics() {
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="panel">
           <div className="panel-header !block">
-            <h2 className="font-semibold">Topic categories</h2>
+            <h2 className="font-semibold">주제 분류</h2>
             <p className="mt-1 text-xs muted">
-              An observation, rather than a rule for the next story.
+              분석 결과는 관찰 기록이며 편집 규칙으로 자동 적용되지 않습니다.
             </p>
           </div>
           {computed.categories.length ? (
@@ -633,7 +628,7 @@ export function Analytics() {
                   <div>
                     <p className="text-sm font-medium">{c.name}</p>
                     <p className="mt-1 text-[11px] muted">
-                      {c.sample} complete post{c.sample === 1 ? "" : "s"}
+                      {c.sample} 비교 가능한 게시물{c.sample === 1 ? "" : "s"}
                     </p>
                   </div>
                   <div className="text-right">
@@ -641,7 +636,7 @@ export function Analytics() {
                       {c.rate === null ? "—" : `${c.rate.toFixed(2)}%`}
                     </p>
                     <p className="mt-1 text-[10px] muted">
-                      median engagement / reach
+                      도달 대비 반응 중앙값
                     </p>
                   </div>
                 </div>
@@ -649,16 +644,16 @@ export function Analytics() {
             </div>
           ) : (
             <Empty
-              title="No categorized post metrics"
-              detail="Categories and authorized post snapshots will appear here."
+              title="분류된 게시물 지표 없음"
+              detail="주제 분류와 인증된 게시물 지표가 여기에 표시됩니다."
             />
           )}
         </section>
         <section className="panel">
           <div className="panel-header !block">
-            <h2 className="font-semibold">Revenue & production costs</h2>
+            <h2 className="font-semibold">수익 및 제작 비용</h2>
             <p className="mt-1 text-xs muted">
-              Only recorded financial entries, kept in their original currency.
+              기록된 금액만 원래 통화로 표시합니다.
             </p>
           </div>
           {computed.money.length ? (
@@ -666,17 +661,17 @@ export function Analytics() {
               {computed.money.map((m) => (
                 <div className="grid grid-cols-3 gap-3 p-5" key={m.currency}>
                   <div>
-                    <p className="text-[11px] muted">Currency</p>
+                    <p className="text-[11px] muted">통화</p>
                     <p className="mt-2 text-sm font-semibold">{m.currency}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] muted">Revenue</p>
+                    <p className="text-[11px] muted">수익</p>
                     <p className="mt-2 text-sm font-semibold tabular-nums">
                       {number(m.revenue)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] muted">Expenses</p>
+                    <p className="text-[11px] muted">비용</p>
                     <p className="mt-2 text-sm font-semibold tabular-nums">
                       {number(m.expense)}
                     </p>
@@ -686,40 +681,39 @@ export function Analytics() {
             </div>
           ) : (
             <Empty
-              title="No financial records for this period"
-              detail="Unavailable revenue and expenses are never replaced with estimates."
+              title="이 기간의 재무 기록 없음"
+              detail="알 수 없는 수익과 비용은 추정치로 대체하지 않습니다."
             />
           )}
         </section>
       </div>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/30 p-4 text-xs leading-relaxed muted">
         <strong className="font-medium text-[var(--text)]">
-          Reading these comparisons.
+          비교 지표 해석 안내
         </strong>{" "}
-        Engagement / reach = (likes + comments + saves + shares) ÷ reach. Posts
-        with incomplete metrics are excluded. Post tables use the latest
-        available snapshot for posts published in the selected period; account
-        metrics use daily snapshots within the period. Production time uses
-        published projects updated during the period. Audience, post age, topic
-        and distribution can affect comparisons. Correlations do not establish
-        causes.
+        도달 대비 반응 = (좋아요 + 댓글 + 저장 + 공유) ÷ 도달입니다. 지표가
+        불완전한 게시물은 제외합니다. 게시물은 선택 기간에 게시된 콘텐츠의 최신
+        기록을, 계정은 기간 내 일별 기록을 사용합니다. 제작 시간은 해당 기간에
+        갱신된 게시 완료 프로젝트를 기준으로 합니다. 독자 구성, 게시 후 경과
+        시간, 주제와 배포 방식이 비교에 영향을 줄 수 있습니다. 상관관계만으로
+        원인을 단정하지 않습니다.
         {data.demo &&
-          " All demo observations are illustrative and provide no evidence of actual account performance."}
+          " 모든 데모 분석은 예시이며 실제 계정 성과의 근거가 아닙니다."}
       </div>
       <section className="panel">
         <div className="panel-header flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 font-semibold">
-              <Lightbulb size={16} /> Weekly learning proposals
+              <Lightbulb size={16} /> 주간 개선 제안
             </h2>
             <p className="mt-1 text-xs muted">
-              Based on all stored evidence. Human approval is required; rules
-              are never rewritten automatically.
+              저장된 근거를 바탕으로 제안합니다. 사람의 승인이 필요하며 규칙을
+              자동 변경하지 않습니다.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="ghost" size="sm" onClick={() => void refresh()}>
-              Refresh proposals
+              제안 새로고침
             </Button>
             <Button
               variant="outline"
@@ -729,12 +723,12 @@ export function Analytics() {
                 action(
                   "recommend",
                   { action: "recommend" },
-                  "Weekly report job queued. Check the Analyst task in the Office, then refresh proposals for its confirmed result.",
+                  "주간 보고서를 대기열에 추가했습니다. 오피스에서 분석 담당 작업을 확인한 뒤 제안을 새로고침하세요.",
                 )
               }
             >
               <Sparkles size={13} />
-              {busy === "recommend" ? "Queuing…" : "Generate proposals"}
+              {busy === "recommend" ? "대기열에 등록 중…" : "개선 제안 생성"}
             </Button>
           </div>
         </div>
@@ -745,7 +739,7 @@ export function Analytics() {
                 <h3 className="text-sm font-semibold">
                   {recommendation.title}
                 </h3>
-                <Badge>{recommendation.status.toLowerCase()}</Badge>
+                <Badge>{koreanLabel(recommendation.status)}</Badge>
               </div>
               <p className="mt-3 max-w-4xl text-sm leading-relaxed muted">
                 {recommendation.rationale}
@@ -753,7 +747,7 @@ export function Analytics() {
               {recommendation.experimentResult && (
                 <div className="mt-3 rounded-lg bg-[var(--muted)] p-3">
                   <p className="text-[10px] font-semibold uppercase tracking-wider muted">
-                    Recorded experiment result
+                    기록된 실험 결과
                   </p>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
                     {recommendation.experimentResult}
@@ -774,11 +768,11 @@ export function Analytics() {
                             action: "approve",
                             recommendationId: recommendation.id,
                           },
-                          "Experiment proposal approved. Editorial and design rules remain subject to a separate human decision.",
+                          "실험 제안을 승인했습니다. 편집 및 디자인 규칙 변경은 별도로 승인해야 합니다.",
                         )
                       }
                     >
-                      <Check size={13} /> Approve experiment
+                      <Check size={13} /> 실험 승인
                     </Button>
                     <Button
                       variant="ghost"
@@ -791,11 +785,11 @@ export function Analytics() {
                             action: "reject",
                             recommendationId: recommendation.id,
                           },
-                          "Proposal rejected.",
+                          "제안을 반려했습니다.",
                         )
                       }
                     >
-                      <X size={13} /> Reject
+                      <X size={13} /> 반려
                     </Button>
                   </>
                 )}
@@ -808,7 +802,7 @@ export function Analytics() {
                       setResult(recommendation.experimentResult || "");
                     }}
                   >
-                    <FlaskConical size={13} /> Record result
+                    <FlaskConical size={13} /> 결과 기록
                   </Button>
                 )}
               </div>
@@ -816,8 +810,8 @@ export function Analytics() {
           ))}
           {data.recommendations.length === 0 && (
             <Empty
-              title="Room for your next experiment"
-              detail="Generate proposals from stored evidence, then decide what is worth testing."
+              title="다음 실험을 준비하세요"
+              detail="저장된 근거로 제안을 생성하고 실험할 내용을 선택하세요."
             />
           )}
         </div>
@@ -830,11 +824,11 @@ export function Analytics() {
       >
         <DialogContent>
           <DialogTitle className="text-xl font-semibold">
-            Record an experiment result
+            실험 결과 기록
           </DialogTitle>
           <DialogDescription className="mt-2 text-sm muted">
-            {experiment?.title}. Describe the observation window, sample size,
-            quality tradeoffs and limitations.
+            {experiment?.title}. 관찰 기간, 표본 수, 품질 변화와 한계를
+            작성하세요.
           </DialogDescription>
           <form
             className="mt-5 space-y-4"
@@ -849,14 +843,14 @@ export function Analytics() {
                     recommendationId: experiment.id,
                     result,
                   },
-                  "Experiment result recorded.",
+                  "실험 결과를 기록했습니다.",
                 ))
               )
                 setExperiment(null);
             }}
           >
             <label className="block">
-              <span className="field-label">Results & limitations</span>
+              <span className="field-label">결과 및 한계</span>
               <textarea
                 className="input mt-2 min-h-44 w-full"
                 required
@@ -864,7 +858,7 @@ export function Analytics() {
                 maxLength={4000}
                 value={result}
                 onChange={(e) => setResult(e.target.value)}
-                placeholder="What changed, what was measured, and what remains uncertain?"
+                placeholder="무엇을 바꾸고 측정했나요? 아직 불확실한 점은 무엇인가요?"
               />
             </label>
             {notice?.failed && (
@@ -873,7 +867,7 @@ export function Analytics() {
               </p>
             )}
             <Button type="submit" disabled={!!busy || !result.trim()}>
-              <Check size={14} /> Save result
+              <Check size={14} /> 결과 저장
             </Button>
           </form>
         </DialogContent>

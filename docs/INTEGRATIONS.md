@@ -1,86 +1,50 @@
-# Integrations and verification boundaries
+# 서비스 연결 계약
 
-All provider integrations run on the server. API credentials are never included in workspace JSON responses or client bundles. OAuth credentials are encrypted with AES-256-GCM using `TOKEN_ENCRYPTION_KEY`; direct access-token environment variables are an optional development alternative. OAuth implementations exist, but actual Canva, OpenAI, and Meta authorization and end-to-end provider operations have **not been tested with live credentials**. Unit tests mock provider responses and verify guardrails; they do not establish provider access or successful real publishing.
+실행 및 실제 계정 인증 순서는 [실제 제작·게시 안내](REAL_PUBLISH_KO.md)를 따르세요. 외부 앱 인증 값은 환경 변수로 설정하며 토큰은 서버에 AES-256-GCM으로 암호화해 저장합니다. 브라우저에는 값 대신 설정 상태만 반환합니다. 설정 정보가 있다는 사실과 실제 API 성공은 별도입니다.
 
-## Implemented versus pending
+## Canva
 
-| Component    | Implemented                                                                                                                                                                                  | Pending / requires authorization                                                                                                                               |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Intelligence | RSS and manual source ingestion, canonical URLs, publisher-aware deduplication, timestamps, rights, explainable relevance, uncertainty, source-restricted AI drafts and topic proposals      | Live OpenAI test; authorized news API and Google Trends adapters; cross-article fact checking beyond feed metadata                                             |
-| Canva        | Read-only reference inspection, actual Brand Template dataset inspection, supported text/image autofill job creation, job reconciliation, new editable design validation, human-review queue | Approved Brand Template setup, Enterprise/autofill access where required, live provider test, upload interface, video replacement and arbitrary page insertion |
-| Instagram    | Authorized Graph API follower/account/post insights synchronization, nullable unavailable metrics, exact media classification, daily idempotent snapshots                                    | Live authorized-account test; provider-dependent metric/scope compatibility                                                                                    |
-| Publishing   | Reviewed reel container creation, processing polling, explicit revision-and-media approval, real media_publish confirmation, duplicate protection after ambiguity                            | Live publishing test; carousel ordered assets and child containers; manual provider reconciliation UI                                                          |
-| Automation   | BullMQ queue, Redis, retries/backoff, job limiter, recurring schedules, persistent actual task events, real local demo dedup/report                                                          | Provider-level quota tuning, recurring schedule UI, external alert delivery                                                                                    |
-| Learning     | Size-aware engagement/reach comparison, complete metric sample sizes, weekly proposals, human approval requirement                                                                           | More extensive schedule/topic analysis and statistically controlled experiment design                                                                          |
+정확한 원본은 DAHPXU1IGDI, DAHXJGy8do8, DAHPcvVkH8k입니다. THE MOVE 릴스는 마지막 원본만 사용합니다. 원본을 수정하거나 다른 임의 릴스 템플릿으로 대체하지 않습니다.
 
-## News sources and AI
+실제 메타데이터와 `GET /rest/v1/designs/{id}/dataset`을 조회합니다. 필드가 있으면 `POST /rest/v1/autofills`에 `type=create_from_design`과 원본 design_id를 전달합니다. API는 **새 디자인**을 생성합니다. `update_design`은 사용하지 않습니다. 지원되는 데이터는 text, image, video입니다. 이미지 유형 필드에는 공식 API가 지원하는 video 자료도 사용할 수 있습니다. 실제 자료 ID가 없으면 생성하지 않습니다. 원본 프레임의 위치·크기는 API에 변경 요청하지 않습니다.
 
-Add an RSS source in Intelligence with an HTTPS URL and explicit rights notes. Retrieval is bounded to 2 MB and 15 seconds; redirects are limited to three. Private, loopback, link-local, reserved and special-purpose IP ranges are denied. Every DNS answer must be public, and the validated address is pinned to the HTTPS connection, preventing rebinding. TLS verification remains enabled. Source URLs may be stored as HTTP references, but automated RSS retrieval requires HTTPS.
+기존 원본에 필드가 없는 경우 사본을 만들어 설정하고 승인된 브랜드 템플릿으로 연결합니다. 관리자 설정은 원본과의 시각적 일치에 대한 사람의 확인이며 API가 이를 증명하지 않습니다. 연결은 UI 또는 CANVA_BRAND_TEMPLATE_MAP으로 지정할 수 있습니다.
 
-Only feed metadata is ingested: publication/retrieval dates, headlines, links and attribution. Relevance scores are deterministic keyword/recency heuristics with explanations. Confidence reflects the available reference metadata, not a fact-checked probability or a prediction of virality. Independent publisher references are preserved; matching headlines alone do not establish independent corroboration. Rights notes do not imply permission to reuse media.
-
-Set `OPENAI_API_KEY` and optionally `OPENAI_MODEL` (default configured in the service). Draft generation sends selected stored topic references and versioned channel guidelines to OpenAI Responses with strict JSON output. Unknown or omitted references, unsourced embedded URLs and invalid output are rejected. Output carries research uncertainty and requires human review; it cannot create an approval. Topic recommendations are sourced proposals and cannot change editorial rules. Review your OpenAI data policy before sending unpublished material.
-
-## Canva setup and source preservation
-
-Approved reference designs:
-
-| Purpose                       | Source design ID |
-| ----------------------------- | ---------------- |
-| THE MOVE carousel, operator 1 | `DAHPXU1IGDI`    |
-| THE MOVE carousel, operator 2 | `DAHXJGy8do8`    |
-| THE MOVE landscape-video reel | `DAHPcvVkH8k`    |
-
-These are **design IDs**, not assumed Brand Template IDs. The integration never modifies source designs. Creating a new autofill design uses a separately configured, approved Brand Template. In Canva, use **Make a copy** on the reference, preserve the brand hierarchy and 1080 × 1350 carousel canvas, configure named dataset fields, publish it as a Brand Template, and review it before mapping its ID. Eligible Canva account/API access is required.
-
-You can set `CANVA_BRAND_TEMPLATE_DAHPXU1IGDI` and `CANVA_BRAND_TEMPLATE_DAHXJGy8do8` to the corresponding real Brand Template IDs. For explicit page-count metadata, use JSON:
-
-```dotenv
-CANVA_BRAND_TEMPLATE_MAP={"DAHPXU1IGDI":{"brandTemplateId":"YOUR_APPROVED_BRAND_TEMPLATE_ID","pageCount":5}}
+```json
+{
+  "DAHPXU1IGDI": {"brandTemplateId": "사용자가_승인한_실제_ID", "pageCount": 5},
+  "DAHXJGy8do8": {"brandTemplateId": "사용자가_승인한_실제_ID", "pageCount": 5}
+}
 ```
 
-Map configuration is a human assertion that the duplicate preserves the reference; the application cannot visually prove equivalent design layouts. Inspect the actual dataset first via `GET /rest/v1/brand-templates/{id}/dataset`. Recognized text field names (`HEADLINE`/`TITLE`, `BODY`/`COPY`/`CAPTION`, `SOURCE_CREDIT`/`SOURCES`/`CREDIT`) can be populated from the project. Other field names require explicit mappings in the generation request. Image fields require existing authorized Canva `asset_id` values; assets are not fabricated. Unsupported dataset types return an actionable error.
+HEADLINE/TITLE/제목/헤드라인은 제목, BODY/COPY/CAPTION/본문/캡션은 초안, SOURCE_CREDIT/SOURCES/CREDIT/출처는 출처 링크로 추론합니다. 다른 필드는 화면에 실제 이름 그대로 입력합니다. 문구 길이 검사는 보수적인 사전 검사이며 실제 글꼴과 줄바꿈을 보증하지 않습니다. 입력 페이지 수가 실제 원본·승인된 템플릿과 다르면 설정 오류를 반환합니다.
 
-`POST /rest/v1/autofills` creates a job. `GET /rest/v1/autofills/{jobId}` reconciles it. Only a provider-returned, new design ID and editable Canva URL become READY. An accepted but incomplete job stays QUEUED; a GET reconciliation does not create another design. Ambiguous submissions remain blocked until the provider result is inspected. Estimated text-length and line limits are preflight checks only: exact wrapping, overflow, image placement and brand fidelity require human preview in Canva.
+결과는 `GET /rest/v1/autofills/{jobId}`에서 확인합니다. 원본과 다른 새 디자인 ID 및 HTTPS Canva 편집 링크를 받은 경우에만 READY로 기록합니다. 작업 접수만으로 생성 성공을 표시하지 않습니다. 수동 제출한 사본은 MANUAL_REVIEW이며 API 생성으로 표시하지 않습니다.
 
-Autofill preserves template page count. For variable page counts, prepare approved Brand Templates with the required counts; this integration cannot append/remove arbitrary pages. The service supports page-count configuration and detects requested mismatches.
+검토 단계에서 `POST /rest/v1/exports`를 호출합니다. 캐러셀은 1080 × 1350 PNG를 페이지별로 요청해 ZIP 대신 이미지 주소를 가져오며 릴스는 vertical_1080p MP4로 내보냅니다. 모든 작업이 성공해야 순서대로 파일을 제공합니다. 내보낸 파일을 받은 프로젝트의 기존 승인은 무효화하고 다시 검토합니다. 내보내기 요청 결과가 불명확하면 자동으로 반복하지 않습니다. 다운로드 주소가 만료되므로 장기 예약에는 별도 소유 저장소가 필요합니다.
 
-Current autofill dataset support does not provide automatic video replacement. THE MOVE reels therefore return **SETUP_REQUIRED**: duplicate **only `DAHPcvVkH8k`**, preserve its 1080 × 1920 canvas and landscape-video frame/aspect ratio, replace the headline and video manually, retain THE MOVE branding, add source credit, and submit the new editable link for human review using **Record a new Canva copy** in Canva Factory. The service validates the link host and rejects original source IDs; the design remains MANUAL_REVIEW, explicitly operator-submitted and API-unverified. No alternate reel template is substituted. Canva production never triggers Instagram publishing.
+공식 자료: [원본 필드 조회](https://www.canva.dev/docs/connect/api-reference/designs/get-design-dataset/), [자동 채우기 생성](https://www.canva.dev/docs/connect/api-reference/autofills/create-design-autofill-job/), [내보내기](https://www.canva.dev/docs/connect/api-reference/exports/create-design-export-job/). 최신 문서의 Autofill 자격에는 Canva Pro·Teams·Enterprise 등이 포함됩니다. 실제 계정 자격과 이용 한도는 인증 후 확인해야 합니다.
 
-Official references: [Connect API](https://www.canva.dev/docs/connect/), [Autofill](https://www.canva.dev/docs/connect/autofill-guide/), [Brand Template dataset](https://www.canva.dev/docs/connect/api-reference/brand-templates/get-brand-template-dataset/), [Create autofill job](https://www.canva.dev/docs/connect/api-reference/autofills/create-design-autofill-job/).
+## Meta Instagram
 
-## Meta Instagram Graph API
+현재 실제 연동은 @themovemag_만 허용합니다. 인증된 `/me/accounts` 목록에서 발견하거나 직접 입력한 프로페셔널 계정 ID를 조회합니다. API의 username과 id가 정확히 일치해야 연결합니다. 토큰이 접근할 수 있는 다른 계정을 THE MOVE로 오인하지 않습니다.
 
-The implementation uses Facebook Login for Instagram professional accounts, connected to an authorized Facebook Page. Configure `META_APP_ID`, `META_APP_SECRET`, `META_GRAPH_VERSION` (default `v23.0`) and OAuth redirect URL derived from `APP_URL`, then connect in Settings. App review/appropriate access levels may be needed. Requested scopes are `instagram_basic`, `instagram_manage_insights`, `instagram_content_publish`, `pages_show_list`, and `pages_read_engagement`. An environment `META_ACCESS_TOKEN` may alternatively provide an existing authorized token. Configure each channel's professional account ID; page/account autodiscovery is not assumed.
+기본 공식 Graph 버전은 v23.0이며 META_GRAPH_VERSION으로 유효한 버전을 지정합니다. OAuth 권한은 instagram_basic, instagram_manage_insights, instagram_content_publish, pages_show_list, pages_read_engagement입니다. 프로페셔널 계정의 Facebook 페이지 연결, 앱 역할·검토와 권한 승인이 필요합니다.
 
-Account `followers_count`, account insights (`views`, `reach`, `total_interactions`) and individual post insights (`views`, `reach`, `likes`, `comments`, `saved`, `shares`) are requested separately. Unsupported or unavailable insight values remain null. Authorization, rate limiting and connectivity failures stop synchronization rather than manufacture data. An actual observed zero remains zero. Daily snapshots reflect the current UTC day up to synchronization; followers are observed at `syncedAt`. The dashboard shows source and synchronization time.
+지표는 API가 제공한 값만 기록합니다. 조회 불가와 관찰된 0은 구분합니다. 최근 게시물은 최대 100개 목록과 최신 20개 게시물 지표를 제한적으로 조회하며 당일 목록이 완전하지 않으면 게시 수를 비워 둡니다. 저장 시점의 누적 게시물 지표를 여러 날 합산하지 않습니다. 팔로워 변화는 이전 관찰 기록이 있어야 계산합니다. 지표 날짜는 관찰한 UTC 일자를 저장하고 화면 시각은 한국 표준시로 표시합니다.
 
-Media pagination is bounded to 100 items; daily post counts remain unavailable if the entire current-day window cannot be established. Post metrics are synchronized for the latest 20 returned posts per run, so broader history requires subsequent ingestion work. Pagination uses the provider cursor and rebuilds the fixed official endpoint; token-bearing next URLs are never followed. A post's metrics are lifetime observations at a snapshot time and must not be summed across snapshot dates. `REELS`, `CAROUSEL_ALBUM`, ordinary `IMAGE`, and non-reel `VIDEO` are recorded separately.
+게시 직전에도 계정 이름과 ID를 재조회합니다. 현재 저장된 버전의 편집 승인과 최종 `{mediaUrl, caption, mediaUrls?}`의 SHA-256 값에 대한 사람 게시 승인이 필요합니다. 캐러셀은 순서가 정해진 이미지 2~10개를 사용하고 이미지 자식 컨테이너가 처리된 뒤 부모 컨테이너를 만듭니다. 릴스는 영상 컨테이너를 만듭니다. 알려진 컨테이너는 다시 확인하며 반복 생성하지 않습니다. 컨테이너 완료 확인 후 media_publish를 호출하고 실제 ID를 받은 경우에만 PUBLISHED로 기록합니다.
 
-The worker uses only supported API access. No competitor scraping, password-based account access, private endpoint extraction, or invented synchronization success is provided. API availability depends on Meta account type, permissions and version. Validate authorized account/metric compatibility before relying on production reports.
+응답이 불명확한 요청은 자동 재전송하지 않습니다. 컨테이너·게시 요청 이력을 대조하고 관리자가 결과를 확인해야 합니다. 데모의 실제 게시는 차단됩니다. Canva 생성 자체가 게시를 실행하지 않습니다.
 
-Official references: [Instagram Platform](https://developers.facebook.com/docs/instagram-platform/), [Insights](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/insights), [Publishing](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/content-publishing).
+## OpenAI 및 정보 수집
 
-## Human-approved publishing
+AI는 선택 기능입니다. OPENAI_API_KEY를 서버에 설정합니다. 저장된 출처와 채널 지침을 Responses API에 전달하고 엄격한 구조의 한국어 초안·편집 제안을 요청합니다. 제공하지 않은 출처나 누락된 근거, 임의 URL은 거절합니다. 초안은 사실 검증이나 승인 완료를 주장하지 않습니다. 규칙은 자동 변경하지 않습니다.
 
-Demo mode cannot publish real Instagram media. Live publishing requires both editorial and publication approvals from a human, matching the project's current revision. Publication approval also stores a SHA-256 fingerprint of the exact final `{mediaUrl, caption}` payload. Changes invalidate approval; legacy approvals without the fingerprint are rejected. A scheduled job waits until its approved scheduled time.
+RSS·직접 제출 출처는 URL 정규화, 중복 제거, 발행·수집 날짜와 이용 권한을 저장합니다. 관련도는 이름·지침의 키워드 일치와 최신성 규칙입니다. 바이럴 확률로 표현하지 않습니다. 피드 제목 일치와 복수 도메인이 기사 내용의 사실을 증명하지 않습니다.
 
-The media URL must resolve to a public HTTPS destination. The current single-media scheduler supports reels. Carousel publishing needs ordered child assets and is deliberately blocked with an actionable message.
+## 작업 및 보안
 
-The sequence is `POST /{igUserId}/media` → persist returned container ID → `GET /{containerId}?fields=status_code` → wait for `FINISHED` → reserve the publish attempt → `POST /{igUserId}/media_publish`. Only a successful real response containing the post ID records PUBLISHED. Processing retries reuse the existing container. Network uncertainty, malformed responses or server errors after a submission never cause automatic duplication.
+Redis/BullMQ 작업 처리기는 대기·실행·실패·완료와 실제 결과를 기록합니다. 재시도, 지수 지연, 요청 속도 제한과 멱등 키를 사용합니다. 외부 쓰기 요청의 불명확한 결과는 재시도 대상에서 제외합니다. API 토큰은 고정 공식 호스트에만 전송합니다. 외부 출처와 미디어는 공개 주소 확인 및 제한된 요청 보호를 적용합니다. 프록시 환경의 TLS 신뢰와 패키지 무결성 검증은 유지합니다.
 
-After an ambiguous outcome, inspect the authorized Instagram account and reconcile the real provider container/post ID. Do not reset RUNNING or delete audit markers merely to retry. A dedicated reconciliation UI is pending; review and record the actual provider result through an administrator-controlled workflow before any new approved publication.
-
-## Automation
-
-Start Redis and set `REDIS_URL`, then run `npm run worker` alongside the web process. The worker validates real prerequisites; missing credentials appear as failed tasks in Office. Office animation is derived only from persisted QUEUED/RUNNING/result events. Idle agents have no synthetic activity. Demo mode without Redis can directly run deterministic topic deduplication and weekly report creation; these are actual operations and remain labeled DEMO.
-
-Recurring jobs use **Asia/Seoul**: news ingestion every two hours, deduplication ten minutes later, account metrics daily at 01:00, snapshots daily at 13:00, AI topic recommendations daily at 00:30, and weekly reports Monday at 00:00. Demo worker scheduling enables only deduplication and weekly reports. Redis scheduling and PostgreSQL persistence must use the same environment configuration as the web application.
-
-Retries use exponential backoff for ordinary jobs and five-second polling for existing processing publication containers. A job limiter starts at most 12 jobs per minute with concurrency two; provider read requests also respect rate-limit responses and bounded retries. Non-idempotent writes are not silently retried after uncertain outcomes. Actual provider quotas still require deployment-specific tuning. Source ingest, daily metrics, weekly proposals and recurring task IDs are idempotent; significant operations are audited. All worker/database errors must be investigated, and a failed task is never presented as a completed external operation.
-
-## Cloud proxy transport
-
-Official fixed API/OAuth endpoints and OpenAI requests use the environment egress proxy when configured; TLS verification remains on. If direct DNS is unavailable, RSS sources require an exact administrator-verified public hostname in `SOURCE_PROXY_ALLOWED_HOSTS` (comma-separated; no wildcard or IP). Each redirect is revalidated and response-size limits remain active. Publishing media uses a separate `MEDIA_PROXY_ALLOWED_HOSTS` list for trusted, publicly accessible asset hosts. These lists complement the platform network policy; they do not replace it. Known private DNS answers are rejected even if a host is listed. In proxy mode the trusted egress service resolves the approved public hostname; the application does not fabricate a locally resolved IP.
-
-A real read-only validation retrieved GitHub’s public Next.js releases Atom feed, normalized 10 entries with source/retrieval timestamps, and confirmed a second ingest added zero duplicate topics. This verifies RSS transport/ingestion, not OpenAI, Canva, Meta authorization or publishing.
+현재 실제 Canva·Meta·OpenAI 계정의 외부 종단 검증은 인증 미제공으로 미완료입니다. API 대체 응답 테스트를 실제 게시 성공으로 간주하지 않습니다.

@@ -4,11 +4,14 @@ import { createDemoData } from "../lib/demo";
 import type { WorkspaceData } from "../lib/domain";
 import * as http from "../lib/integrations/http";
 import * as transport from "../lib/integrations/transport";
+import * as identity from "../lib/integrations/the-move-account";
 import { readInsight } from "../lib/integrations/meta";
 import {
   validateCopyLayout,
   validateTemplate,
   generateCanvaDesign,
+  inspectCanvaTemplate,
+  exportCanvaDesign,
 } from "../lib/services/canva";
 import {
   assertPublicationApproved,
@@ -271,8 +274,11 @@ describe("Canva preservation and capability checks", () => {
       }),
     ).not.toThrow();
   });
-  it("returns an actionable manual reel workflow without creating a provider design", async () => {
-    const call = vi.spyOn(http, "officialApi");
+  it("reports missing real reel dataset fields without submitting a provider design", async () => {
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ design: { id: "DAHPcvVkH8k", page_count: 1 } })
+      .mockResolvedValueOnce({ dataset: {} });
     const project = fixture.data!.projects.find(
       (p) => p.id === "demo-project-4",
     )!;
@@ -281,7 +287,7 @@ describe("Canva preservation and capability checks", () => {
     await expect(
       generateCanvaDesign(project.id, "move-reel-landscape", "operator-1"),
     ).rejects.toMatchObject({ code: "SETUP_REQUIRED" });
-    expect(call).not.toHaveBeenCalled();
+    expect(call.mock.calls.every(([, options]) => !options.method)).toBe(true);
     expect(fixture.data!.designs).toHaveLength(0);
   });
 });
@@ -294,7 +300,12 @@ function preparePublication() {
   project.draftCopy = "Reviewed sourced copy.";
   project.sourceUrls = ["https://example.com/research"];
   data.channels.find((c) => c.id === project.channelId)!.platformAccountId =
-    "authorized-account";
+    "178414000000001";
+  data.channels.find((c) => c.id === project.channelId)!.connected = true;
+  vi.spyOn(identity, "verifyTheMoveAccount").mockResolvedValue({
+    id: "178414000000001",
+    username: "themovemag_",
+  });
   data.publications = [
     {
       id: "publication-1",
@@ -430,5 +441,378 @@ describe("publication approval and duplicate prevention", () => {
         ([url]) => url.includes("/media?") || url.endsWith("/media"),
       ),
     ).toHaveLength(1);
+  });
+});
+
+describe("THE MOVE account identity", () => {
+  it("rejects a different username and a mismatched professional account ID", () => {
+    expect(() =>
+      identity.assertTheMoveIdentity(
+        { id: "178414000000001", username: "themovemag_" },
+        "178414000000001",
+      ),
+    ).not.toThrow();
+    expect(() =>
+      identity.assertTheMoveIdentity({
+        id: "178414000000001",
+        username: "anotherbrand",
+      }),
+    ).toThrow(/@themovemag_/);
+    expect(() =>
+      identity.assertTheMoveIdentity(
+        { id: "178414000000001", username: "themovemag_" },
+        "178414000000002",
+      ),
+    ).toThrow(/@themovemag_/);
+  });
+  it("discovers the exact authorized account and checks its identity before mapping", async () => {
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({
+        data: [
+          {
+            instagram_business_account: {
+              id: "178414000000002",
+              username: "other",
+            },
+          },
+          {
+            instagram_business_account: {
+              id: "178414000000001",
+              username: "themovemag_",
+            },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        id: "178414000000001",
+        username: "themovemag_",
+      });
+    await identity.connectTheMoveAccount("operator-1");
+    expect(
+      fixture.data!.channels.find((c) => c.id === "the-move"),
+    ).toMatchObject({
+      handle: "@themovemag_",
+      platformAccountId: "178414000000001",
+      connected: true,
+    });
+    expect(
+      fixture
+        .data!.channels.filter((c) => c.id !== "the-move")
+        .every((c) => !c.connected),
+    ).toBe(true);
+    expect(call.mock.calls[0][0]).not.toContain("access_token");
+  });
+  it("does not record a manually supplied unrelated account as connected", async () => {
+    vi.spyOn(http, "officialApi").mockResolvedValueOnce({
+      id: "178414000000002",
+      username: "other",
+    });
+    await expect(
+      identity.connectTheMoveAccount("operator-1", "178414000000002"),
+    ).rejects.toMatchObject({ code: "ACCOUNT_MISMATCH" });
+    expect(fixture.data!.channels.every((c) => !c.connected)).toBe(true);
+  });
+});
+
+function prepareExport() {
+  const project = fixture.data!.projects.find(
+    (p) => p.id === "demo-project-1",
+  )!;
+  project.stage = "REVIEW";
+  fixture.data!.designs.push({
+    id: "new-copy",
+    projectId: project.id,
+    templateId: "move-carousel-1",
+    status: "MANUAL_REVIEW",
+    externalId: "NEW_COPY",
+    editUrl: "https://www.canva.com/design/NEW_COPY/edit",
+    error: null,
+    createdAt: new Date().toISOString(),
+  });
+  return { project, design: fixture.data!.designs[0] };
+}
+
+describe("Canva actual reference and ordered exports (provider contract fixtures)", () => {
+  it("stores the actual API thumbnail even when autofill setup is missing", async () => {
+    vi.stubEnv("CANVA_BRAND_TEMPLATE_MAP", "{}");
+    vi.stubEnv("CANVA_BRAND_TEMPLATE_DAHPXU1IGDI", "");
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({
+        design: {
+          id: "DAHPXU1IGDI",
+          thumbnail: { url: "https://cdn.canva.example/actual.png" },
+          title: "Actual original",
+        },
+      })
+      .mockResolvedValueOnce({ design: { id: "DAHPXU1IGDI", page_count: 5 } })
+      .mockResolvedValueOnce({ dataset: {} });
+    await expect(
+      inspectCanvaTemplate("move-carousel-1", "operator-1"),
+    ).rejects.toMatchObject({ code: "SETUP_REQUIRED" });
+    expect(fixture.data!.templates[0].configuration?.previewUrl).toBe(
+      "https://cdn.canva.example/actual.png",
+    );
+    expect(fixture.data!.templates[0].status).toBe("SETUP_REQUIRED");
+    expect(call).toHaveBeenCalledTimes(3);
+    expect(call.mock.calls[0][1].method).toBeUndefined();
+  });
+  it("exports each page separately, in order, and sends no original design to an export endpoint", async () => {
+    const { project, design } = prepareExport();
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ design: { id: "NEW_COPY", page_count: 2 } })
+      .mockResolvedValueOnce({
+        job: {
+          id: "page-1",
+          status: "success",
+          urls: ["https://cdn.example/1.png"],
+        },
+      })
+      .mockResolvedValueOnce({
+        job: {
+          id: "page-2",
+          status: "success",
+          urls: ["https://cdn.example/2.png"],
+        },
+      });
+    const output = await exportCanvaDesign(design.id, "operator-1");
+    expect(output.exportUrls).toEqual([
+      "https://cdn.example/1.png",
+      "https://cdn.example/2.png",
+    ]);
+    expect(call.mock.calls[1][1].body).toMatchObject({
+      design_id: "NEW_COPY",
+      format: { type: "png", width: 1080, height: 1350, pages: [1] },
+    });
+    expect(call.mock.calls[2][1].body).toMatchObject({
+      format: { pages: [2] },
+    });
+    expect(project.stage).toBe("REVIEW");
+    expect(fixture.data!.publications).toHaveLength(0);
+  });
+  it("does not expose incomplete export files as ready and reconciles all jobs before returning files", async () => {
+    const { design } = prepareExport();
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ design: { id: "NEW_COPY", page_count: 2 } })
+      .mockResolvedValueOnce({
+        job: {
+          id: "page-1",
+          status: "success",
+          urls: ["https://cdn.example/1.png"],
+        },
+      })
+      .mockResolvedValueOnce({ job: { id: "page-2", status: "in_progress" } });
+    expect(
+      (await exportCanvaDesign(design.id, "operator-1")).exportUrls,
+    ).toEqual([]);
+    call
+      .mockResolvedValueOnce({
+        job: {
+          id: "page-1",
+          status: "success",
+          urls: ["https://cdn.example/1.png"],
+        },
+      })
+      .mockResolvedValueOnce({
+        job: {
+          id: "page-2",
+          status: "success",
+          urls: ["https://cdn.example/2.png"],
+        },
+      });
+    expect(
+      (await exportCanvaDesign(design.id, "operator-1", true)).exportUrls,
+    ).toHaveLength(2);
+  });
+  it("blocks a duplicate export submission after an ambiguous API outcome", async () => {
+    const { design } = prepareExport();
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ design: { id: "NEW_COPY", page_count: 2 } })
+      .mockRejectedValueOnce(
+        new ServiceError("API_OUTCOME_UNKNOWN", "Unconfirmed export"),
+      );
+    await expect(
+      exportCanvaDesign(design.id, "operator-1"),
+    ).rejects.toMatchObject({ code: "API_OUTCOME_UNKNOWN" });
+    await expect(
+      exportCanvaDesign(design.id, "operator-1", true),
+    ).rejects.toMatchObject({ code: "RECONCILIATION_REQUIRED" });
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(design.exportUrls).toEqual([]);
+  });
+  it("rejects originals and approved revisions before any export request", async () => {
+    const { project, design } = prepareExport();
+    const call = vi.spyOn(http, "officialApi");
+    design.externalId = "DAHPXU1IGDI";
+    await expect(
+      exportCanvaDesign(design.id, "operator-1"),
+    ).rejects.toMatchObject({ code: "DESIGN_REQUIRED" });
+    design.externalId = "NEW_COPY";
+    project.stage = "APPROVED";
+    await expect(
+      exportCanvaDesign(design.id, "operator-1"),
+    ).rejects.toMatchObject({ code: "REVIEW_REQUIRED" });
+    expect(call).not.toHaveBeenCalled();
+  });
+});
+
+function prepareCarousel() {
+  const { data, project } = preparePublication();
+  project.format = "CAROUSEL";
+  const publication = data.publications[0];
+  publication.mediaUrls = [
+    "https://cdn.example/1.png",
+    "https://cdn.example/2.png",
+  ];
+  publication.mediaUrl = publication.mediaUrls[0];
+  data.approvals.find((a) => a.kind === "PUBLICATION")!.payloadHash =
+    publicationFingerprint(
+      publication.mediaUrl,
+      publication.caption,
+      publication.mediaUrls,
+    );
+  return { data, project, publication };
+}
+
+describe("ordered carousel publishing (provider contract fixtures)", () => {
+  it("creates ordered child containers and records publication only after the parent is published", async () => {
+    const { data, publication } = prepareCarousel();
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ id: "image-1" })
+      .mockResolvedValueOnce({ status_code: "FINISHED" })
+      .mockResolvedValueOnce({ id: "image-2" })
+      .mockResolvedValueOnce({ status_code: "FINISHED" })
+      .mockResolvedValueOnce({ id: "parent" })
+      .mockResolvedValueOnce({ status_code: "FINISHED" })
+      .mockImplementationOnce(async () => {
+        expect(publication.status).toBe("RUNNING");
+        return { id: "real-confirmed-post" };
+      });
+    await publishScheduledPublication(publication.id, "operator-1");
+    expect(call.mock.calls[0][1].body).toMatchObject({
+      image_url: "https://cdn.example/1.png",
+      is_carousel_item: true,
+    });
+    expect(call.mock.calls[4][1].body).toMatchObject({
+      media_type: "CAROUSEL",
+      children: ["image-1", "image-2"],
+    });
+    expect(publication.status).toBe("PUBLISHED");
+    expect(
+      data.posts.some(
+        (p) => p.id === "meta-real-confirmed-post" && p.format === "CAROUSEL",
+      ),
+    ).toBe(true);
+  });
+  it("invalidates approval when image order changes", async () => {
+    const { publication } = prepareCarousel();
+    publication.mediaUrls!.reverse();
+    const call = vi.spyOn(http, "officialApi");
+    await expect(
+      publishScheduledPublication(publication.id, "operator-1"),
+    ).rejects.toMatchObject({ code: "APPROVAL_REQUIRED" });
+    expect(call).not.toHaveBeenCalled();
+  });
+  it("polls a known processing child without creating a duplicate", async () => {
+    const { publication } = prepareCarousel();
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ id: "image-1" })
+      .mockResolvedValueOnce({ status_code: "IN_PROGRESS" });
+    await expect(
+      publishScheduledPublication(publication.id, "operator-1"),
+    ).rejects.toMatchObject({ code: "CONTAINER_PROCESSING" });
+    call
+      .mockResolvedValueOnce({ status_code: "FINISHED" })
+      .mockResolvedValueOnce({ id: "image-2" })
+      .mockResolvedValueOnce({ status_code: "FINISHED" })
+      .mockResolvedValueOnce({ id: "parent" })
+      .mockResolvedValueOnce({ status_code: "FINISHED" })
+      .mockResolvedValueOnce({ id: "confirmed-carousel" });
+    await publishScheduledPublication(publication.id, "operator-1");
+    const imageRequests = call.mock.calls.filter(
+      ([, options]) =>
+        (options.body as { is_carousel_item?: boolean } | undefined)
+          ?.is_carousel_item,
+    );
+    expect(imageRequests).toHaveLength(2);
+  });
+  it("blocks an account identity failure before sending media", async () => {
+    const { publication } = prepareCarousel();
+    vi.mocked(identity.verifyTheMoveAccount).mockRejectedValue(
+      new ServiceError("ACCOUNT_MISMATCH", "Wrong account"),
+    );
+    const call = vi.spyOn(http, "officialApi");
+    await expect(
+      publishScheduledPublication(publication.id, "operator-1"),
+    ).rejects.toMatchObject({ code: "ACCOUNT_MISMATCH" });
+    expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe("direct Canva design autofill with official video fields", () => {
+  it("creates a new reel using DAHPcvVkH8k and preserves the original while filling an authorized video asset", async () => {
+    const project = fixture.data!.projects.find(
+      (p) => p.id === "demo-project-4",
+    )!;
+    project.draftCopy = "검토할 초안";
+    project.sourceUrls = ["https://example.com/research"];
+    const call = vi
+      .spyOn(http, "officialApi")
+      .mockResolvedValueOnce({ design: { id: "DAHPcvVkH8k", page_count: 1 } })
+      .mockResolvedValueOnce({
+        dataset: {
+          headline: { type: "text" },
+          landscape_video: { type: "image" },
+          source_credit: { type: "text" },
+        },
+      })
+      .mockResolvedValueOnce({ job: { id: "reel-job", status: "in_progress" } })
+      .mockResolvedValueOnce({
+        job: {
+          id: "reel-job",
+          status: "success",
+          result: {
+            type: "create_design",
+            design: {
+              id: "NEW_REEL",
+              urls: { edit_url: "https://www.canva.com/design/NEW_REEL/edit" },
+            },
+          },
+        },
+      });
+    const design = await generateCanvaDesign(
+      project.id,
+      "move-reel-landscape",
+      "operator-2",
+      {
+        fields: {
+          landscape_video: { type: "video", asset_id: "VA_authorized_asset" },
+        },
+        pageCount: 1,
+      },
+    );
+    expect(call.mock.calls[2][1].body).toMatchObject({
+      type: "create_from_design",
+      design_id: "DAHPcvVkH8k",
+      data: {
+        landscape_video: { type: "video", asset_id: "VA_authorized_asset" },
+      },
+    });
+    expect(
+      call.mock.calls.some(
+        ([, options]) =>
+          (options.body as { type?: string })?.type === "update_design",
+      ),
+    ).toBe(false);
+    expect(design.externalId).toBe("NEW_REEL");
+    expect(design.status).toBe("READY");
+    expect(project.stage).toBe("REVIEW");
+    expect(fixture.data!.publications).toHaveLength(0);
   });
 });

@@ -1,18 +1,25 @@
 # THE MOVE OS
 
-A working editorial workspace for THE MOVE, Korea-coded and The Standard.
+THE MOVE의 정보 수집, 편집, Canva 제작과 Instagram 게시를 관리하는 작업 공간입니다. 화면 언어는 한국어이며 날짜는 한국 표준시로 표시합니다. 실제 Instagram 연동·게시 대상은 **@themovemag_**입니다. 다른 브랜드의 편집 프로젝트는 유지하되 실제 계정 연동은 현재 THE MOVE에 집중합니다.
 
-**Discover → Research → Draft → Design → Review → Publish → Measure**
+**발견 → 조사 → 평가 → 초안 → 디자인 → 검토 → 승인 → 게시 → 분석**
 
-Built with Next.js 16, React 19, TypeScript, Tailwind 4, shadcn-style Radix UI components, Recharts, Framer Motion, PostgreSQL/Prisma and BullMQ/Redis. Phase 1 is runnable; later-phase adapters are authorization-gated and do not claim provider success.
+Next.js 16, React 19, TypeScript, Tailwind 4, Radix 기반 shadcn 스타일 컴포넌트, Recharts, Framer Motion, PostgreSQL/Prisma, BullMQ/Redis를 사용합니다. 예시 지표에는 데모 표시가 있으며 실제 API 결과가 없는 연결·생성·게시를 성공으로 기록하지 않습니다.
 
-## Quick start — labeled demo
+## 내 컴퓨터에서 실행
 
-For a browser-based local demo with automatic setup, run **START-WINDOWS.bat** on Windows or **START-MAC.command** on Mac. Node 24 or later is required. See [한국어 실행 안내](START-HERE.md). The launcher installs dependencies as needed, generates local keys and Prisma, verifies login and workspace access, then opens the browser. Docker and external API credentials are not required for this demo.
+Node.js 24 이상이 필요합니다. ZIP 압축을 풀고 다음 파일을 실행하세요.
 
-Local setup calls npm directly through Node, reports elapsed time and downloads, and records `.move-runtime/setup.log`. It skips dependency lifecycle scripts and explicitly generates Prisma's JavaScript client, avoiding unused native-engine downloads while retaining npm integrity and TLS checks. Interrupted installations are retried; successful installations are reused for the same lockfile. A Windows CI job validates a fresh demo install and login in a directory with spaces.
+| 실행 목적 | Windows | Mac |
+|---|---|---|
+| 외부 인증 없이 데모 보기 | START-WINDOWS.bat | START-MAC.command |
+| 실제 계정 인증 및 게시 | START-LIVE-WINDOWS.bat | START-LIVE-MAC.command |
 
-Requires Node.js 24 (see `.node-version`) and npm. No external API credentials are needed.
+데모 실행기는 설치 진행 로그와 경과 시간을 표시하고 로그인·데이터 요청을 확인한 뒤 브라우저를 엽니다. 중단된 설치는 재시도하며 성공한 설치는 재사용합니다. 실제 운영 실행기는 Docker Desktop이 필요하며 데이터베이스·앱·예약 게시 작업 처리기를 함께 실행합니다. 실제 운영의 계정 비밀번호와 인증 정보는 별도 `.env.live`에서 관리합니다.
+
+[처음 실행 안내](START-HERE.md) · [실제 Canva 및 Instagram 게시 안내](docs/REAL_PUBLISH_KO.md)
+
+### 개발용 데모 직접 실행
 
 ```sh
 npm ci
@@ -21,92 +28,58 @@ npm run db:generate
 npm run dev
 ```
 
-Open the application on your local machine at port 3000. Demo login fields are prefilled. Demo-only accounts:
+본인 컴퓨터에서 실행한 뒤 `http://localhost:3000`으로 접속합니다. 데모 로그인 필드는 미리 입력됩니다. `operator1@themove.local` 또는 `operator2@themove.local` / `move-demo-2026`은 DEMO_MODE=true에서만 사용되는 공개 예시 계정입니다. 실제 운영 계정 비밀번호는 별도로 생성됩니다.
 
-- `operator1@themove.local` / `move-demo-2026` — Admin
-- `operator2@themove.local` / `move-demo-2026` — Operator
+데모 편집 내용은 Git에서 제외한 `.move-data/workspace.json`에 저장됩니다. 기존 파일과 `.env`는 덮어쓰지 않습니다. 기본 예시 출처는 꺼져 있으며 실제 조사 근거가 아닙니다. 오피스 작업은 실제로 실행한 작업만 표시합니다. Redis 없이 로컬 데모의 중복 정리와 주간 분석은 직접 실행할 수 있습니다.
 
-These test credentials are intentionally public and only work with `DEMO_MODE=true`. Demo data is stored in ignored `.move-data/workspace.json`; restart preserves edits. To reset, stop the app and worker and move that directory aside; it may contain encrypted local OAuth bindings if you authorized integrations. Never expose a demo deployment publicly.
-
-The UI labels sample statistics. Source fixtures use example.com and are not research evidence. Agents start idle; tasks appear only when actual operations run. Without Redis, genuine demo deduplication and weekly analysis run inline. To use a worker:
+## 실제 운영 및 개발 인프라
 
 ```sh
 docker compose up -d postgres redis
-npm run worker
-```
-
-The generated `.env` points `REDIS_URL` at local Redis. When Redis is configured it must be running for queue actions. Clear REDIS_URL only if you intentionally want the two inline demo jobs. Docker processes, Next.js and the worker must restart in a fresh cloud task; files and dependencies alone are retained.
-
-## PostgreSQL workspace
-
-1. Copy `.env.example` to `.env` using `npm run setup:local` (preserves an existing file); keep the random session/encryption keys.
-2. Set `DEMO_MODE=false` and enter distinct, secure `OPERATOR_1_PASSWORD` and `OPERATOR_2_PASSWORD` values (at least 12 characters). Do not put secrets in Git or chat.
-3. Start infrastructure and apply migrations:
-
-```sh
-docker compose up -d postgres redis
-npm run db:generate
 npm run db:migrate
 npm run db:seed
 npm run dev
-# Another terminal:
+# 별도 터미널에서
 npm run worker
 ```
 
-PostgreSQL seed creates the two local-email operators, channel guidelines and exact Canva references. Existing operators/passwords are preserved on rerun. It creates no sample performance data. Production mode never falls back to demo on DB failure. For real deployments change local database password, use HTTPS APP_URL and a protected database/Redis network. The Docker local password is a public development-only default.
+위 직접 실행은 `.env`에 DEMO_MODE=false와 서로 다른 12자 이상 운영자 비밀번호를 설정한 경우에 사용합니다. 실제 운영 실행기는 별도 `.env.live`와 Docker 프로젝트를 사용하므로 기본 데모와 혼합하지 않습니다. PostgreSQL 장애 시 데모로 자동 전환하지 않습니다. 재실행한 시드는 기존 운영자 비밀번호와 계정 데이터를 보존합니다. 공개 운영에는 HTTPS, 별도 DB·Redis 네트워크 및 외부 앱의 권한 승인이 필요합니다.
 
-### Complete Docker development stack
+## 실제 Canva 원본
 
-With `.env` set up, non-demo operator passwords filled, and port 3000 free:
+- 운영자 1 캐러셀: `DAHPXU1IGDI`
+- 운영자 2 캐러셀: `DAHXJGy8do8`
+- THE MOVE 릴스: **`DAHPcvVkH8k`만 사용**
 
-```sh
-docker compose up --build
-```
+원본 읽기와 실제 데이터셋 검사 후 `create_from_design`으로 새 디자인을 생성합니다. 원본을 수정하는 `update_design`은 사용하지 않습니다. 실제 필드가 없는 경우 원본 사본에 필드를 설정하고 승인된 브랜드 템플릿으로 연결하는 작업을 안내합니다. 공식 API가 지원하는 문구·이미지·영상 필드를 입력하며 계정의 Autofill 이용 자격이 필요합니다. 임의 페이지 추가나 디자인 일치 확인을 가장하지 않습니다. 실제 줄바꿈, 원본과의 시각적 일치와 브랜드 유지 여부는 사람이 확인합니다.
 
-The app applies migrations and seeds idempotently before starting; the worker waits for readiness. PostgreSQL and Redis ports bind to loopback. API authorization remains optional until the corresponding integration is used. See [setup details](docs/SETUP.md).
+Canva 결과물을 페이지별 PNG 또는 릴스 MP4로 내보내고 스튜디오로 가져옵니다. 편집 승인과 최종 이미지 순서·주소·캡션에 대한 게시 승인은 별도입니다. Canva 파일 주소가 만료될 수 있어 늦은 예약에는 운영자 소유의 지속적인 HTTPS 저장소가 필요합니다.
 
-## Verification
+## 검증
 
 ```sh
 npm run typecheck
 npm test
 npm run build
-# Browser tests run the labeled demo workflow; use DEMO_MODE=true and configured local keys.
 CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
-# Alternatively install Playwright Chromium on a supported host:
-npx playwright install chromium
-npm run test:e2e
-# PostgreSQL check requires DEMO_MODE=false and a migrated/seeded disposable test DB:
+# PostgreSQL 검증은 별도의 마이그레이션·시드가 적용된 시험 DB에서 실행
 npm run test:db
-# With the local infrastructure running and the Docker image built:
-npm run test:docker
 ```
 
-Unit tests exercise approval invalidation, token tampering, source provenance/SSRF guards, template rules, missing metrics, idempotency and concurrency. Browser tests exercise login, navigation, persistence, editorial approvals and role/origin guardrails. PostgreSQL checks test real normalized writes, migration checksum checks/rollback, and non-destructive seeding. External provider calls require separate credentialed E2E validation.
+Windows CI는 공백이 있는 새 폴더에서 설치·로그인·Chrome 실제 화면을 검증합니다. 단위 테스트는 계정 일치, 승인 무효화, 토큰 변조, 출처·미디어 요청 보호, 이미지 순서, 페이지별 내보내기, 중복 요청과 불명확한 응답을 검사합니다. 외부 API 응답을 대체한 계약 테스트와 실제 외부 계정 종단 테스트는 구분합니다. **실제 Canva 및 Meta 인증이 없는 환경에서는 실제 원본 조회·생성·게시 성공을 검증하지 못합니다.** GPT 플러그인 연결은 다운로드한 앱의 인증으로 자동 전달되지 않습니다.
 
-## Integrations and feature status
+## 문서 및 구조
 
-- [Integration contracts and limitations](docs/INTEGRATIONS.md)
-- [Implemented vs pending by phase](docs/FEATURES.md)
-- [Setup and operating instructions](docs/SETUP.md)
-- [API endpoints](docs/API.md)
-- [Observed validation and remaining integration checks](docs/VALIDATION.md)
-
-The source designs `DAHPXU1IGDI`, `DAHXJGy8do8`, and `DAHPcvVkH8k` are preserved. A design ID is not an autofill dataset. THE MOVE reels only use the landscape-video reference `DAHPcvVkH8k`. Creating a Canva draft never publishes it. Instagram publication requires separate approval of the current project **and the exact final media URL/caption**.
-
-## Project layout
+[설치](docs/SETUP.md) · [API](docs/API.md) · [연결 계약](docs/INTEGRATIONS.md) · [구현 및 미완료 항목](docs/FEATURES.md) · [검증 기록](docs/VALIDATION.md)
 
 ```text
-app/                  App Router pages and authenticated API routes
-components/           Workspace UI and reusable Radix/shadcn-style primitives
-lib/domain.ts         Typed shared entities
-lib/data.ts           PostgreSQL and explicit local-demo persistence
-lib/services/         Editorial, intelligence, Canva, analytics, publishing
-lib/integrations/     Provider APIs, source fetching, HTTP transport
-lib/jobs.ts           BullMQ queue, real task/event lifecycle and schedules
-prisma/               Schema, SQL migrations and secure seed
-scripts/              Worker, migration runner and database verification
-tests/                Unit and browser tests
+app/                  인증된 화면 및 API
+components/           재사용 가능한 한국어 화면
+lib/services/         조사·제작·분석·게시 서비스
+lib/integrations/     공식 API 및 외부 주소 보호
+prisma/               정규화 DB 스키마·마이그레이션·시드
+scripts/              실행기·작업 처리기·검증 도구
+tests/                단위 및 브라우저 테스트
 ```
 
-Prisma uses its supported JavaScript query compiler and `@prisma/adapter-pg`. The checked-in SQL migrations are generated from the Prisma schema. A transactional `pg` runner applies them to the compatible `_prisma_migrations` ledger with checksums and an advisory lock, avoiding native engine downloads and a Prisma 6.19 JS migration adapter PostgreSQL `name`-type issue. `npm run db:migrate` is the tested deploy path; no TLS or checksum verification is disabled.
+비밀 인증 정보는 환경 변수 또는 서버의 AES-256-GCM 암호화 저장소에 보관합니다. 역할 검증, 동일 출처 요청 검증과 주요 변경 감사 기록을 적용합니다. 생성이나 편집 단계 변경만으로 실제 게시되지 않습니다.

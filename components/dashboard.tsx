@@ -38,9 +38,9 @@ import type { AccountMetric } from "@/lib/domain";
 const number = (value: number | null) =>
   value === null
     ? "—"
-    : new Intl.NumberFormat("en-US").format(Math.round(value));
+    : new Intl.NumberFormat("ko-KR").format(Math.round(value));
 const compact = (value: number) =>
-  new Intl.NumberFormat("en-US", {
+  new Intl.NumberFormat("ko-KR", {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
@@ -50,14 +50,14 @@ const nullableSum = (values: (number | null)[]) =>
     : null;
 const toDate = (date: string) => date.slice(0, 10);
 const stageLabels: Record<string, string> = {
-  IDEA: "Ideas",
-  RESEARCH: "Research",
-  DRAFT: "Drafts",
-  DESIGN: "Design",
-  REVIEW: "In review",
-  APPROVED: "Approved",
-  SCHEDULED: "Scheduled",
-  PUBLISHED: "Published",
+  IDEA: "아이디어",
+  RESEARCH: "조사",
+  DRAFT: "초안",
+  DESIGN: "디자인",
+  REVIEW: "검토 중",
+  APPROVED: "승인 완료",
+  SCHEDULED: "게시 예약",
+  PUBLISHED: "게시 완료",
 };
 
 export function Dashboard() {
@@ -179,7 +179,7 @@ export function Dashboard() {
     return (
       <>
         <WorkspaceError />
-        <div className="empty-state">Your workspace could not be loaded.</div>
+        <div className="empty-state">작업 공간을 불러오지 못했습니다.</div>
       </>
     );
   const update = async () => {
@@ -191,13 +191,11 @@ export function Dashboard() {
     ? [
         ...new Set(
           report.metrics.map((m) =>
-            m.source === "DEMO"
-              ? "Demo seed · sample data"
-              : "Meta Instagram API",
+            m.source === "DEMO" ? "데모 · 예시 데이터" : "Meta Instagram API",
           ),
         ),
       ].join(", ")
-    : "No synchronized source";
+    : "동기화된 출처 없음";
   const publishedCount = nullableSum(
     report.metrics.map((m) => m.postsPublished),
   );
@@ -216,13 +214,13 @@ export function Dashboard() {
     <>
       <div className="page-header">
         <div>
-          <p className="eyebrow">YOUR EDITORIAL OVERVIEW</p>
+          <p className="eyebrow">편집 현황</p>
           <h1 className="page-title">
-            Dashboard
+            대시보드
             <span className="inline-block w-1.5 h-1.5 bg-[var(--accent)] rounded-full ml-1.5" />
           </h1>
           <p className="page-description">
-            A clear view of your channels, content, and momentum.
+            채널과 콘텐츠 제작 현황을 한눈에 확인하세요.
           </p>
         </div>
         <div className="flex items-center gap-2 mt-2">
@@ -234,11 +232,11 @@ export function Dashboard() {
             disabled={refreshing}
           >
             <RefreshCw size={12} className={refreshing ? "spin" : ""} />
-            {refreshing ? "Refreshing" : "Refresh workspace"}
+            {refreshing ? "새로고침 중" : "작업 공간 새로고침"}
           </Button>
           <Button variant="outline" asChild size="sm" className="!text-[10px]">
             <Link href="/analytics">
-              View analytics
+              분석 보기
               <ArrowUpRight size={12} />
             </Link>
           </Button>
@@ -249,12 +247,12 @@ export function Dashboard() {
         <div className="filter-row">
           <div className="relative">
             <select
-              aria-label="Report channel"
+              aria-label="보고서 채널"
               className="select !text-[11px] !w-44 !pr-8 appearance-none"
               value={channelId}
               onChange={(e) => setChannelId(e.target.value)}
             >
-              <option value="all">All channels</option>
+              <option value="all">전체 채널</option>
               {data.channels.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -266,14 +264,14 @@ export function Dashboard() {
               className="absolute right-3 top-3 pointer-events-none muted"
             />
           </div>
-          <div className="period-switch" aria-label="Reporting period">
+          <div className="period-switch" aria-label="보고 기간">
             {["7", "30", "90", "custom"].map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={period === p ? "active" : ""}
               >
-                {p === "custom" ? "Custom" : `${p} days`}
+                {p === "custom" ? "직접 선택" : `${p}일`}
               </button>
             ))}
           </div>
@@ -282,7 +280,7 @@ export function Dashboard() {
               <input
                 className="input !text-[10px] !w-32"
                 type="date"
-                aria-label="Report start date"
+                aria-label="보고 시작일"
                 value={start}
                 max={end}
                 onChange={(e) => setStart(e.target.value)}
@@ -291,7 +289,7 @@ export function Dashboard() {
               <input
                 className="input !text-[10px] !w-32"
                 type="date"
-                aria-label="Report end date"
+                aria-label="보고 종료일"
                 value={end}
                 min={start}
                 onChange={(e) => setEnd(e.target.value)}
@@ -303,15 +301,15 @@ export function Dashboard() {
           <span
             className={`status-dot ${report.syncedAt ? "" : "disconnected"}`}
           />
-          {data.demo ? "Sample snapshot:" : "Last synchronized:"}{" "}
+          {data.demo ? "예시 기록:" : "마지막 동기화:"}{" "}
           {report.syncedAt
-            ? new Date(report.syncedAt).toLocaleString("en-US", {
+            ? new Date(report.syncedAt).toLocaleString("ko-KR", {
                 month: "short",
                 day: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
               })
-            : "Not synchronized"}
+            : "동기화 전"}
         </div>
       </div>
       {data.demo && (
@@ -319,23 +317,23 @@ export function Dashboard() {
           <Radio size={13} className="mt-0.5 shrink-0" />
           <span>
             <strong className="font-semibold text-[var(--text)]">
-              You’re viewing a demo workspace.
+              현재 데모 작업 공간입니다.
             </strong>{" "}
-            Metrics and published posts below are sample data. Connect
-            authorized accounts in Settings to use live data.
+            아래 지표와 게시물은 예시입니다. 설정에서 인증된 계정을 연결해야
+            실제 데이터를 볼 수 있습니다.
           </span>
           <Link
             href="/settings"
             className="ml-auto shrink-0 text-[var(--text)] flex items-center gap-1"
           >
-            Connections
+            연결 설정
             <ArrowRight size={11} />
           </Link>
         </div>
       )}
       <div className="stat-grid">
         <Stat
-          title="Total followers"
+          title="전체 팔로워"
           value={number(report.followers)}
           icon={<Users size={14} />}
           footer={
@@ -351,42 +349,42 @@ export function Dashboard() {
                   )}{" "}
                   {number(Math.abs(report.dailyDelta))}
                 </span>
-                <span>latest daily change</span>
+                <span>최근 일별 변화</span>
               </>
             ) : (
-              <>Daily change unavailable</>
+              <>일별 변화 확인 불가</>
             )
           }
           demo={data.demo}
         />
         <Stat
-          title="Content views"
+          title="콘텐츠 조회수"
           value={number(report.views)}
           icon={<Eye size={14} />}
           footer={
             <>
-              {number(publishedCount)} {data.demo ? "sample " : ""}posts ·
-              reporting period
+              {number(publishedCount)} {data.demo ? "예시 " : ""}게시물 · 선택
+              기간
             </>
           }
           demo={data.demo}
         />
         <Stat
-          title="Account reach"
+          title="계정 도달"
           value={number(report.reach)}
           icon={<ScanLine size={14} />}
-          footer={<>Sum of daily reach · non-unique</>}
+          footer={<>일별 도달 합계 · 중복 포함</>}
           demo={data.demo}
         />
         <Stat
-          title="Engagement rate"
+          title="반응률"
           value={
             report.engagementRate === null
               ? "—"
               : `${report.engagementRate.toFixed(2)}%`
           }
           icon={<Heart size={14} />}
-          footer={<>Interactions ÷ daily reach</>}
+          footer={<>반응 수 ÷ 일별 도달</>}
           demo={data.demo}
         />
       </div>
@@ -394,17 +392,17 @@ export function Dashboard() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2 className="panel-title">Follower growth</h2>
+              <h2 className="panel-title">팔로워 추이</h2>
               <p className="panel-subtitle">
-                Daily account snapshots across{" "}
+                일별 계정 기록:{" "}
                 {report.channels.length === 1
                   ? report.channels[0].name
-                  : "all selected channels"}
+                  : "선택한 전체 채널"}
               </p>
             </div>
             <div className="text-[9px] muted flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-              Followers
+              팔로워
             </div>
           </div>
           {report.chart.length ? (
@@ -447,7 +445,7 @@ export function Dashboard() {
                     tick={{ fontSize: 9, fill: "var(--muted-text)" }}
                     tickFormatter={(date) =>
                       new Date(`${date}T12:00:00Z`).toLocaleDateString(
-                        "en-US",
+                        "ko-KR",
                         { month: "short", day: "numeric" },
                       )
                     }
@@ -471,13 +469,13 @@ export function Dashboard() {
                     }}
                     labelFormatter={(date) =>
                       new Date(`${date}T12:00:00Z`).toLocaleDateString(
-                        "en-US",
+                        "ko-KR",
                         { month: "long", day: "numeric" },
                       )
                     }
                     formatter={(value) => [
                       number(Number(value)),
-                      data.demo ? "Sample followers" : "Followers",
+                      data.demo ? "예시 팔로워" : "팔로워",
                     ]}
                   />
                   <Area
@@ -498,11 +496,11 @@ export function Dashboard() {
             </div>
           ) : (
             <div className="empty-state h-[250px]">
-              No account snapshots for this reporting period.
+              이 기간의 계정 기록이 없습니다.
             </div>
           )}
           <div className="border-t border-[var(--border)] px-5 py-3 text-[9px] muted flex justify-between gap-3">
-            <span>Source: {source}</span>
+            <span>출처: {source}</span>
             <span>
               {report.startDate} — {report.endDate}
             </span>
@@ -511,10 +509,8 @@ export function Dashboard() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2 className="panel-title">Content pipeline</h2>
-              <p className="panel-subtitle">
-                From first idea to final approval
-              </p>
+              <h2 className="panel-title">제작 흐름</h2>
+              <p className="panel-subtitle">아이디어부터 최종 승인까지</p>
             </div>
             <Layers2 size={15} className="muted" />
           </div>
@@ -569,13 +565,13 @@ export function Dashboard() {
                   (p) => !["PUBLISHED", "SCHEDULED"].includes(p.stage),
                 ).length
               }{" "}
-              projects in production
+              개 제작 중
             </span>
             <Link
               href="/studio"
               className="flex items-center gap-1 text-[10px] font-medium"
             >
-              Open studio
+              스튜디오 열기
               <ArrowRight size={12} />
             </Link>
           </div>
@@ -584,16 +580,16 @@ export function Dashboard() {
       <section className="panel mb-[23px]">
         <div className="panel-header">
           <div>
-            <h2 className="panel-title">Your channels</h2>
+            <h2 className="panel-title">채널 현황</h2>
             <p className="panel-subtitle">
-              One workspace. Every brand in view.
+              한 작업 공간에서 채널을 관리합니다.
             </p>
           </div>
           <Link
             href="/settings"
             className="flex items-center gap-1 text-[10px] muted"
           >
-            Manage channels
+            채널 관리
             <ArrowUpRight size={12} />
           </Link>
         </div>
@@ -601,13 +597,13 @@ export function Dashboard() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Channel</th>
-                <th>Followers</th>
-                <th>Daily change</th>
-                <th>Views</th>
-                <th>Engagement</th>
-                <th>Posts</th>
-                <th>Connection</th>
+                <th>채널</th>
+                <th>팔로워</th>
+                <th>일별 변화</th>
+                <th>조회수</th>
+                <th>반응</th>
+                <th>게시물</th>
+                <th>연결</th>
               </tr>
             </thead>
             <tbody>
@@ -681,10 +677,10 @@ export function Dashboard() {
                         <span
                           className={`status-dot ${channel.connected ? "" : "disconnected"}`}
                         />
-                        {channel.connected ? "Connected" : "Disconnected"}
+                        {channel.connected ? "연결됨" : "연결 안 됨"}
                         {data.demo && (
                           <span className="demo-label !text-[7px] !py-0.5 ml-1">
-                            SAMPLE
+                            예시
                           </span>
                         )}
                       </span>
@@ -700,17 +696,16 @@ export function Dashboard() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2 className="panel-title">Top-performing content</h2>
+              <h2 className="panel-title">주요 성과 콘텐츠</h2>
               <p className="panel-subtitle">
-                Ranked by measured post views
-                {data.demo ? " · sample posts" : ""}
+                확인된 게시물 조회수 순{data.demo ? " · 예시 게시물" : ""}
               </p>
             </div>
             <Link
               href="/analytics"
               className="text-[10px] muted flex items-center gap-1"
             >
-              Explore
+              더 보기
               <ArrowUpRight size={12} />
             </Link>
           </div>
@@ -725,7 +720,7 @@ export function Dashboard() {
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <div className="w-8 h-10 rounded bg-[var(--muted)] flex items-center justify-center text-[9px] font-semibold muted shrink-0">
-                    {post.format === "REEL" ? "RE" : "CA"}
+                    {post.format === "REEL" ? "릴스" : "카드"}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="m-0 text-[11px] font-medium truncate">
@@ -733,8 +728,8 @@ export function Dashboard() {
                     </p>
                     <p className="m-0 text-[9px] muted mt-1">
                       {data.channels.find((c) => c.id === post.channelId)?.name}{" "}
-                      · {post.format === "REEL" ? "Reel" : "Carousel"} ·{" "}
-                      {new Date(post.publishedAt).toLocaleDateString("en-US", {
+                      · {post.format === "REEL" ? "릴스" : "캐러셀"} ·{" "}
+                      {new Date(post.publishedAt).toLocaleDateString("ko-KR", {
                         month: "short",
                         day: "numeric",
                       })}
@@ -744,41 +739,40 @@ export function Dashboard() {
                     <p className="text-[12px] m-0 font-medium tabular-nums">
                       {number(metric?.views ?? null)}
                     </p>
-                    <p className="text-[9px] muted m-0 mt-1">views</p>
+                    <p className="text-[9px] muted m-0 mt-1">조회</p>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="empty-state">
-              No post-level view data for this period.
+              이 기간의 게시물 조회수 데이터가 없습니다.
             </div>
           )}
         </section>
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2 className="panel-title">Production at a glance</h2>
-              <p className="panel-subtitle">The work behind your publishing</p>
+              <h2 className="panel-title">제작 요약</h2>
+              <p className="panel-subtitle">게시를 위한 제작 기록</p>
             </div>
             <Clock3 size={15} className="muted" />
           </div>
           <div className="px-[22px] pb-5 space-y-4">
             <div className="flex justify-between">
-              <span className="text-[10px] muted">Published in period</span>
+              <span className="text-[10px] muted">기간 내 게시</span>
               <span className="text-[11px] font-medium">
-                {number(publishedCount)} posts
+                {number(publishedCount)} 개 게시물
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[10px] muted">Posting frequency</span>
+              <span className="text-[10px] muted">게시 빈도</span>
               <span className="text-[11px] font-medium">
-                {dailyFrequency === null ? "—" : dailyFrequency.toFixed(1)} /
-                day
+                {dailyFrequency === null ? "—" : dailyFrequency.toFixed(1)} / 일
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[10px] muted">Tracked production time</span>
+              <span className="text-[10px] muted">기록된 제작 시간</span>
               <span className="text-[11px] font-medium">
                 {(
                   report.projects.reduce(
@@ -786,7 +780,7 @@ export function Dashboard() {
                     0,
                   ) / 60
                 ).toFixed(1)}{" "}
-                hrs
+                시간
               </span>
             </div>
             <div className="border-t border-[var(--border)] pt-3">
@@ -796,7 +790,7 @@ export function Dashboard() {
                     <div key={currency} className="space-y-2 mb-2">
                       <div className="flex justify-between">
                         <span className="text-[10px] muted">
-                          Revenue · {currency}
+                          수익 · {currency}
                         </span>
                         <span className="text-[11px] font-medium">
                           {number(
@@ -814,7 +808,7 @@ export function Dashboard() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-[10px] muted">
-                          Expenses · {currency}
+                          비용 · {currency}
                         </span>
                         <span className="text-[11px] font-medium">
                           {number(
@@ -835,14 +829,14 @@ export function Dashboard() {
                 )
               ) : (
                 <div className="flex justify-between">
-                  <span className="text-[10px] muted">Revenue / costs</span>
-                  <span className="text-[10px]">No entries yet</span>
+                  <span className="text-[10px] muted">수익 / 비용</span>
+                  <span className="text-[10px]">아직 기록 없음</span>
                 </div>
               )}
             </div>
             <p className="text-[9px] muted leading-relaxed">
-              Production time reflects recorded project entries. Financial data
-              is shown only when available.
+              제작 시간은 프로젝트에 기록한 시간입니다. 재무 데이터는 기록이
+              있을 때만 표시합니다.
             </p>
           </div>
         </section>
@@ -872,7 +866,7 @@ function Stat({
       </div>
       <div className="stat-value">{value}</div>
       <div className="stat-footer">{footer}</div>
-      {demo && <span className="sr-only">Demo sample data</span>}
+      {demo && <span className="sr-only">데모 예시 데이터</span>}
     </section>
   );
 }

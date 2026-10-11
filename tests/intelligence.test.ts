@@ -156,20 +156,18 @@ describe("source normalization and evidence", () => {
     );
     expect(result.confidence).toBe("MEDIUM");
     expect(result.uncertainClaims.join(" ")).toContain(
-      "not been independently fact-checked",
+      "독립적으로 사실 확인하지 않았습니다",
     );
-    expect(result.uncertainClaims.join(" ")).toContain("syndicate");
+    expect(result.uncertainClaims.join(" ")).toContain("재배포");
     expect(result.uncertainClaims.join(" ")).toContain(
-      "more than seven days old",
+      "발행 후 7일이 지났습니다",
     );
   });
 
   it("flags unknown publication dates and keeps single-source confidence low", () => {
     const result = evaluateEvidence(["https://a.example/story"], null);
     expect(result.confidence).toBe("LOW");
-    expect(result.uncertainClaims).toContain(
-      "Publication date is unavailable.",
-    );
+    expect(result.uncertainClaims).toContain("발행일을 확인할 수 없습니다.");
   });
 });
 
@@ -191,7 +189,7 @@ describe("RSS ingestion and editorial deduplication", () => {
     expect(workspace.topics[0].rights).toBe(workspace.sources[0].rights);
     expect(workspace.topics[0].confidence).toBe("LOW");
     expect(workspace.topics[0].scoreExplanation).toContain(
-      "not a probability of virality",
+      "바이럴 확률이 아닙니다",
     );
     expect(workspace.topics[0].publishedAt).toBe("2025-01-01T09:00:00.000Z");
     expect(workspace.sources[0].lastFetchedAt).not.toBeNull();
@@ -447,8 +445,8 @@ describe("fair and honest analytics", () => {
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
     expect(workspace.recommendations).toHaveLength(1);
-    expect(first[0].rationale).toContain("DEMO DATA");
-    expect(first[0].rationale).toContain("not a causal conclusion");
+    expect(first[0].rationale).toContain("예시 데이터");
+    expect(first[0].rationale).toContain("원인을 단정하지 않습니다");
     expect(first[0].status).toBe("PROPOSED");
     expect(workspace.channels[0].guidelines).toBe(originalGuidelines);
     expect(workspace.channels[0].guidelineVersion).toBe(1);

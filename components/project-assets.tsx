@@ -1,4 +1,5 @@
 "use client";
+import { koreanLabel } from "@/lib/korean";
 
 import { useState } from "react";
 import {
@@ -53,7 +54,7 @@ export function ProjectAssets({
       setError(
         cause instanceof Error
           ? cause.message
-          : "The media reference could not be updated.",
+          : "미디어 참조를 변경하지 못했습니다.",
       );
     } finally {
       setBusy(false);
@@ -66,13 +67,11 @@ export function ProjectAssets({
     try {
       if (new URL(url.trim()).protocol !== "https:") throw new Error();
     } catch {
-      setError("Provide a valid HTTPS URL for externally hosted media.");
+      setError("외부 미디어의 올바른 HTTPS 주소를 입력하세요.");
       return;
     }
     if (!credit.trim()) {
-      setError(
-        "Include a source credit and any relevant usage rights information.",
-      );
+      setError("출처와 이용 권한 정보를 입력하세요.");
       return;
     }
     for (const dimension of [width, height]) {
@@ -82,9 +81,7 @@ export function ProjectAssets({
           Number(dimension) < 1 ||
           Number(dimension) > 20000)
       ) {
-        setError(
-          "Optional dimensions must be whole numbers between 1 and 20,000 pixels.",
-        );
+        setError("크기는 1~20,000픽셀 사이의 정수로 입력하세요.");
         return;
       }
     }
@@ -113,7 +110,7 @@ export function ProjectAssets({
           className="text-[11px] font-semibold flex items-center gap-1.5"
         >
           <Link2 size={13} />
-          Media assets{" "}
+          미디어 자료{" "}
           <span className="muted font-normal">({assets.length})</span>
         </h3>
         {!locked && !adding && (
@@ -124,19 +121,18 @@ export function ProjectAssets({
             onClick={() => setAdding(true)}
           >
             <Plus size={12} />
-            Link media
+            미디어 연결
           </Button>
         )}
       </div>
       <p className="field-hint mb-3">
-        Link externally hosted media and record its source credit. A reference
-        does not upload a file or establish ownership. Dimensions are entered by
-        an operator.
+        외부 미디어 주소와 출처를 기록합니다. 파일 업로드나 소유권 확인을
+        의미하지 않습니다. 크기는 운영자가 입력합니다.
       </p>
       {project.stage === "APPROVED" && (
         <p className="text-[10px] muted mb-3">
-          Changing or approving assets sends the project back to Review and
-          invalidates its existing approvals.
+          미디어를 변경하거나 승인하면 검토 단계로 돌아가며 기존 승인은 무효가
+          됩니다.
         </p>
       )}
       {assets.length ? (
@@ -160,7 +156,7 @@ export function ProjectAssets({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[11px] font-medium flex gap-1 items-center"
-                    aria-label={`Preview ${asset.kind.toLowerCase()} media`}
+                    aria-label={`${koreanLabel(asset.kind)} 미리보기`}
                   >
                     <span className="truncate">{asset.url}</span>
                     <ExternalLink size={11} className="shrink-0 muted" />
@@ -169,9 +165,8 @@ export function ProjectAssets({
                     {asset.credit}
                   </p>
                   <p className="text-[9px] muted mt-1">
-                    {asset.kind === "VIDEO" ? "Video" : "Image"} · Reported
-                    dimensions: {asset.width ?? "unknown"} ×{" "}
-                    {asset.height ?? "unknown"}
+                    {asset.kind === "VIDEO" ? "영상" : "이미지"} · 입력된 크기:{" "}
+                    {asset.width ?? "미확인"} × {asset.height ?? "미확인"}
                     {asset.width && asset.height ? " px" : ""}
                   </p>
                 </div>
@@ -180,7 +175,7 @@ export function ProjectAssets({
                 {asset.approved ? (
                   <span className="text-[10px] positive flex items-center gap-1.5 mr-auto">
                     <CheckCircle2 size={12} />
-                    Human reviewed
+                    사람 검토 완료
                   </span>
                 ) : (
                   <Button
@@ -193,7 +188,7 @@ export function ProjectAssets({
                     }
                   >
                     <ShieldCheck size={12} />
-                    Approve asset
+                    미디어 승인
                   </Button>
                 )}
                 {!locked && (
@@ -207,7 +202,7 @@ export function ProjectAssets({
                     }
                   >
                     <Trash2 size={12} />
-                    Remove reference
+                    참조 삭제
                   </Button>
                 )}
               </div>
@@ -217,7 +212,7 @@ export function ProjectAssets({
       ) : (
         !adding && (
           <p className="text-[10px] muted py-3">
-            No media references linked to this project.
+            이 프로젝트에 연결된 미디어가 없습니다.
           </p>
         )
       )}
@@ -229,7 +224,7 @@ export function ProjectAssets({
           <div className="form-grid">
             <div>
               <label className="field-label" htmlFor="asset-kind">
-                Media type
+                미디어 유형
               </label>
               <select
                 id="asset-kind"
@@ -240,13 +235,13 @@ export function ProjectAssets({
                   setKind(event.target.value as "IMAGE" | "VIDEO")
                 }
               >
-                <option value="IMAGE">Image</option>
-                <option value="VIDEO">Video</option>
+                <option value="IMAGE">이미지</option>
+                <option value="VIDEO">영상</option>
               </select>
             </div>
             <div>
               <label className="field-label" htmlFor="asset-url">
-                External HTTPS media URL
+                외부 HTTPS 미디어 주소
               </label>
               <input
                 id="asset-url"
@@ -261,7 +256,7 @@ export function ProjectAssets({
             </div>
             <div className="form-full">
               <label className="field-label" htmlFor="asset-credit">
-                Source credit & usage rights
+                출처 및 이용 권한
               </label>
               <textarea
                 id="asset-credit"
@@ -269,14 +264,14 @@ export function ProjectAssets({
                 required
                 maxLength={2000}
                 disabled={unavailable}
-                placeholder="Creator, source, and relevant license or permission details"
+                placeholder="제작자, 출처, 라이선스 또는 사용 허가 내용"
                 value={credit}
                 onChange={(event) => setCredit(event.target.value)}
               />
             </div>
             <div>
               <label className="field-label" htmlFor="asset-width">
-                Reported width (optional)
+                너비 (선택)
               </label>
               <input
                 id="asset-width"
@@ -291,7 +286,7 @@ export function ProjectAssets({
             </div>
             <div>
               <label className="field-label" htmlFor="asset-height">
-                Reported height (optional)
+                높이 (선택)
               </label>
               <input
                 id="asset-height"
@@ -313,24 +308,23 @@ export function ProjectAssets({
               disabled={busy}
               onClick={() => setAdding(false)}
             >
-              Cancel
+              취소
             </Button>
             <Button size="sm" type="submit" disabled={unavailable}>
               <Link2 size={12} />
-              {busy ? "Linking…" : "Link media"}
+              {busy ? "연결 중…" : "미디어 연결"}
             </Button>
           </div>
         </form>
       )}
       {assets.some((asset) => !asset.approved) && !locked && (
         <p className="field-hint mt-3">
-          Approving an asset records your review of the media, source credit,
-          and usage rights.
+          승인하면 미디어, 출처와 이용 권한을 검토한 기록이 남습니다.
         </p>
       )}
       {locked && (
         <p className="field-hint mt-3">
-          Assets are locked while scheduled or published.
+          예약·게시 상태에서는 미디어를 변경할 수 없습니다.
         </p>
       )}
       {error && (

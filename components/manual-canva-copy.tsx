@@ -42,7 +42,7 @@ export function ManualCanvaCopy({
         preservedLayout: confirmed,
       });
       setMessage(
-        "Your new copy is recorded as Manual review. No Canva API creation or layout verification is claimed.",
+        "새 사본을 수동 검토 상태로 등록했습니다. API 생성이나 디자인 검증 완료를 의미하지 않습니다.",
       );
       setFailed(false);
       setOpen(false);
@@ -51,7 +51,7 @@ export function ManualCanvaCopy({
     } catch (e) {
       setFailed(true);
       setMessage(
-        e instanceof Error ? e.message : "The copy could not be recorded.",
+        e instanceof Error ? e.message : "사본을 등록하지 못했습니다.",
       );
     } finally {
       setBusy(false);
@@ -61,9 +61,9 @@ export function ManualCanvaCopy({
     <section className="panel">
       <div className="panel-header flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold">Manual Canva alternative</h2>
+          <h2 className="font-semibold">Canva 수동 제작</h2>
           <p className="mt-1 text-xs muted">
-            For video replacement, page changes, or unavailable autofill access.
+            영상 교체, 페이지 변경 또는 자동 채우기 사용 불가 시 이용하세요.
           </p>
         </div>
         <Button
@@ -72,17 +72,15 @@ export function ManualCanvaCopy({
           disabled={!eligible || busy}
           onClick={() => setOpen(!open)}
         >
-          <Copy size={13} />
-          Record a new Canva copy
+          <Copy size={13} />새 Canva 사본 등록
         </Button>
       </div>
       <div className="p-5">
         <p className="text-xs leading-relaxed muted">
-          Select a sourced Studio project in Design or Review and its approved
-          reference above. In Canva, use Make a copy, preserve the canvas,
-          hierarchy and brand, then paste the editable link to the new design.
-          THE MOVE reels must duplicate only DAHPcvVkH8k and preserve its
-          landscape-video frame.
+          위에서 출처가 있는 디자인·검토 단계의 프로젝트와 승인된 원본을
+          선택하세요. Canva에서 사본을 만들어 화면 크기, 정보 위계와 브랜드를
+          유지한 뒤 새 편집 링크를 등록하세요. THE MOVE 릴스는 DAHPcvVkH8k만
+          복제하고 가로 영상 프레임을 유지해야 합니다.
         </p>
         {template && (
           <a
@@ -91,7 +89,7 @@ export function ManualCanvaCopy({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open selected reference
+            선택한 원본 열기
             <ExternalLink size={12} />
           </a>
         )}
@@ -99,7 +97,7 @@ export function ManualCanvaCopy({
           <form onSubmit={submit} className="mt-5 space-y-4">
             <div className="grid gap-4 md:grid-cols-[1fr_150px]">
               <label>
-                <span className="field-label">New Canva editable link</span>
+                <span className="field-label">새 Canva 편집 링크</span>
                 <input
                   className="input w-full mt-2"
                   type="url"
@@ -110,7 +108,7 @@ export function ManualCanvaCopy({
                 />
               </label>
               <label>
-                <span className="field-label">Actual page count</span>
+                <span className="field-label">실제 페이지 수</span>
                 <input
                   className="input w-full mt-2"
                   type="number"
@@ -131,11 +129,11 @@ export function ManualCanvaCopy({
                 className="mt-1 accent-red-600"
               />
               <span>
-                I made a new copy without editing the source and checked
-                branding, source credit, line wrapping and the {template?.width}{" "}
-                × {template?.height} canvas. For THE MOVE reels I preserved the
-                landscape-video placement and aspect ratio. This is my
-                declaration; a human visual review is still required.
+                원본을 수정하지 않고 새 사본을 만들었으며 브랜드, 출처 표기,
+                줄바꿈과 다음 화면 크기를 확인했습니다: {template?.width} ×{" "}
+                {template?.height} . THE MOVE 릴스의 가로 영상 위치와 비율을
+                유지했습니다. 이는 등록자의 확인이며 별도 시각 검토가
+                필요합니다.
               </span>
             </label>
             <Button
@@ -144,7 +142,7 @@ export function ManualCanvaCopy({
               disabled={busy || !confirmed || !eligible}
             >
               <ShieldCheck size={13} />
-              {busy ? "Recording…" : "Submit copy for review"}
+              {busy ? "기록 중…" : "사본 검토 요청"}
             </Button>
           </form>
         )}

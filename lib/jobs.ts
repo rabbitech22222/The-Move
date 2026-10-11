@@ -1,3 +1,4 @@
+import { koreanLabel } from "./korean";
 import { createHash, randomUUID } from "node:crypto";
 import { Queue, type ConnectionOptions } from "bullmq";
 import { getWorkspaceData, mutateWorkspace } from "./data";
@@ -168,7 +169,7 @@ export async function createTask(
     kind,
     status: "QUEUED",
     progress: 0,
-    message: "Queued for an actual application operation.",
+    message: "실제 작업 요청을 대기열에 추가했습니다.",
     createdAt: at,
     updatedAt: at,
     result: null,
@@ -301,7 +302,7 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
       actorId,
       "RUNNING",
       10,
-      `Executing ${kind.toLowerCase().replaceAll("_", " ")}.`,
+      `${koreanLabel(kind)} 작업 실행 중입니다.`,
     );
     let result: unknown;
     switch (kind) {
@@ -319,7 +320,7 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
             actorId,
             "RUNNING",
             10 + Math.floor(((index + 1) / sources.length) * 75),
-            `Retrieved ${index + 1} of ${sources.length} authorized sources.`,
+            `승인된 출처 ${sources.length}개 중 ${index + 1}개를 수집했습니다.`,
           );
         }
         result = { sources: results };
@@ -333,7 +334,7 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
         const channels = payload.channelId
           ? [payload.channelId]
           : (await getWorkspaceData()).channels
-              .filter((c) => c.platformAccountId)
+              .filter((c) => c.id === "the-move" && c.platformAccountId)
               .map((c) => c.id);
         if (!channels.length)
           throw new ServiceError(
@@ -349,7 +350,7 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
             actorId,
             "RUNNING",
             10 + Math.floor(((index + 1) / channels.length) * 75),
-            `Synchronized ${index + 1} of ${channels.length} authorized accounts.`,
+            `인증된 계정 ${channels.length}개 중 ${index + 1}개를 동기화했습니다.`,
           );
         }
         result = { channels: results };
@@ -384,7 +385,7 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
       actorId,
       "SUCCEEDED",
       100,
-      "Application operation completed. Inspect the recorded result.",
+      "작업을 완료했습니다. 기록된 결과를 확인하세요.",
       result,
     );
     return result;
