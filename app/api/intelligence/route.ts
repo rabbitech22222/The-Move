@@ -12,6 +12,7 @@ const schema = z.object({
     "create-project",
     "add-source",
     "ingest",
+    "refresh-news",
   ]),
   topicId: z.string().optional(),
   sourceId: z.string().optional(),
@@ -29,6 +30,10 @@ export async function POST(request: Request) {
   return endpoint(async () => {
     const user = await authorize(request, true),
       input = await body(request, schema);
+    if (input.action === "refresh-news") {
+      await enqueueTask("NEWS_INGEST", {}, user.id);
+      return ok(await getWorkspaceData());
+    }
     if (input.action === "ingest") {
       if (!input.sourceId)
         throw new HttpError(400, "SOURCE_REQUIRED", "Select a source.");
@@ -79,7 +84,7 @@ export async function POST(request: Request) {
           operatorId: user.id,
           stage: "RESEARCH",
           format: input.format || topic.format,
-          draftCopy: "",
+          draftCopy: researchBrief(topic),
           sourceUrls: [topic.sourceUrl],
           dueAt: null,
           productionMinutes: 0,
@@ -95,10 +100,32 @@ export async function POST(request: Request) {
         topic.status = "SAVED";
       },
     );
-    if (input.action === "research") {
+    if (input.action === "research" && process.env.OPENAI_API_KEY) {
       await enqueueTask("AI_DRAFT", { projectId }, user.id);
       return ok(await getWorkspaceData());
     }
     return ok(result);
   });
+}
+
+function researchBrief(topic: import("@/lib/domain").Topic) {
+  return `조사 준비 — ${topic.title}
+
+원문 출처: ${topic.sourceUrl}
+발행일: ${topic.publishedAt || "미확인"}
+수집일: ${topic.retrievedAt}
+분류: ${topic.category}
+
+편집 방향: 제목이 제기하는 변화의 배경과 THE MOVE 독자에게 미칠 영향을 원문에서 조사합니다.
+
+확인할 사항
+- 원문의 날짜, 수치, 인명·기관명과 핵심 주장
+- 추가 독립 출처와 기사 재배포 여부
+- 제목에 나타난 변화의 실제 범위와 기존 사례
+- 사진·영상 사용 권한과 출처 표기
+
+불확실성: ${topic.uncertainClaims.join(" / ")}
+이용 권한: ${topic.rights}
+
+[검증한 사실과 근거를 이곳에 정리하세요. 이 조사 준비서는 완성 원고나 사실 확인 결과가 아닙니다.]`;
 }

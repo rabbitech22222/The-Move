@@ -6,9 +6,12 @@ on:
     paths:
       - .github/workflows/windows-launcher.yml
       - scripts/start-demo.mjs
+      - scripts/start-local.mjs
       - scripts/local-process.mjs
       - scripts/check-local-browser.mjs
       - scripts/setup-local.mjs
+      - scripts/prepare-desktop.mjs
+      - scripts/local-worker.ts
       - scripts/prepare-live.mjs
       - scripts/start-live.mjs
       - app/**
@@ -26,6 +29,7 @@ on:
   pull_request:
     paths:
       - scripts/start-demo.mjs
+      - scripts/start-local.mjs
       - scripts/local-process.mjs
       - scripts/check-local-browser.mjs
       - START-WINDOWS.bat
@@ -56,7 +60,7 @@ jobs:
           New-Item -ItemType Directory -Path $target -Force | Out-Null
           Get-ChildItem -Force | Where-Object { $_.Name -ne '.git' } | Copy-Item -Destination $target -Recurse
           Set-Location $target
-          node scripts/start-demo.mjs --check-browser
+          node scripts/start-local.mjs --check-browser
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm test -- tests/local-launcher.test.mjs tests/live-launcher.test.mjs
+          npm test -- tests/local-launcher.test.mjs tests/live-launcher.test.mjs tests/desktop-launcher.test.mjs
           exit $LASTEXITCODE

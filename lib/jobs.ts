@@ -1,4 +1,5 @@
 import { koreanLabel } from "./korean";
+import { isLocalOperation } from "./runtime";
 import { createHash, randomUUID } from "node:crypto";
 import { Queue, type ConnectionOptions } from "bullmq";
 import { getWorkspaceData, mutateWorkspace } from "./data";
@@ -228,6 +229,7 @@ export async function enqueueTask(
   const data = await getWorkspaceData();
   if (
     !process.env.REDIS_URL &&
+    !isLocalOperation() &&
     !(data.demo && ["TOPIC_DEDUP", "WEEKLY_REPORT"].includes(kind))
   ) {
     throw new ServiceError(
@@ -238,6 +240,21 @@ export async function enqueueTask(
   }
   const task = await createTask(kind, payload, actorId);
   if (task.status !== "QUEUED") return task;
+  if (isLocalOperation()) {
+    const publication =
+      kind === "PUBLICATION"
+        ? data.publications.find((p) => p.id === payload.publicationId)
+        : null;
+    await mutateWorkspace(actorId, "LOCAL_JOB_REGISTERED", task.id, (draft) => {
+      const target = draft.tasks.find((t) => t.id === task.id)!;
+      target.localJob ??= {
+        input: { taskId: task.id, kind, payload, actorId },
+        dueAt: publication ? Date.parse(publication.scheduledAt) : Date.now(),
+        attempts: 0,
+      };
+    });
+    return (await getWorkspaceData()).tasks.find((t) => t.id === task.id)!;
+  }
   if (!process.env.REDIS_URL && data.demo) {
     await processTask({ taskId: task.id, kind, payload, actorId });
   } else {
@@ -313,17 +330,28 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
               .filter((s) => s.enabled)
               .map((s) => s.id);
         const results = [];
+        const failures: { sourceId: string; error: string }[] = [];
         for (const [index, source] of sources.entries()) {
-          results.push(await ingestSource(source, actorId));
+          try {
+            results.push(await ingestSource(source, actorId));
+          } catch (error) {
+            failures.push({ sourceId: source, error: errorMessage(error) });
+          }
           await taskProgress(
             task.id,
             actorId,
             "RUNNING",
             10 + Math.floor(((index + 1) / sources.length) * 75),
-            `승인된 출처 ${sources.length}개 중 ${index + 1}개를 수집했습니다.`,
+            `출처 ${sources.length}개 중 ${index + 1}개 점검: 성공 ${results.length}개, 실패 ${failures.length}개.`,
           );
         }
-        result = { sources: results };
+        if (sources.length && !results.length)
+          throw new ServiceError(
+            "SOURCE_INGEST_FAILED",
+            "모든 뉴스 출처 수집에 실패했습니다. 정보 수집 화면의 출처별 오류와 네트워크를 확인하세요.",
+            502,
+          );
+        result = { sources: results, failures };
         break;
       }
       case "TOPIC_DEDUP":

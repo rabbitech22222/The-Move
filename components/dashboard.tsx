@@ -243,6 +243,55 @@ export function Dashboard() {
         </div>
       </div>
       <WorkspaceError />
+      {!data.demo && (
+        <section className="panel p-5 mb-6" aria-label="실제 작업 시작">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">THE MOVE · 지금 시작할 작업</h2>
+              <p className="text-sm muted mt-2">
+                수집한 실제 뉴스 {data.topics.length}개 · 진행 중인 편집
+                프로젝트{" "}
+                {data.projects.filter((p) => p.stage !== "PUBLISHED").length}개
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/intelligence">
+                뉴스·제작 후보 확인 <ArrowRight size={14} />
+              </Link>
+            </Button>
+          </div>
+          {!data.channels[0]?.connected && (
+            <p className="text-sm mt-4 muted">
+              @themovemag_ 인증이 완료되지 않아 Instagram 지표는 아직 없습니다.{" "}
+              <Link className="underline" href="/settings">
+                계정 인증·지표 수집
+              </Link>
+              을 진행하세요. 뉴스 조사와 편집 작업은 지금 시작할 수 있습니다.
+            </p>
+          )}
+          {data.topics.length > 0 && (
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {[...data.topics]
+                .filter((t) => t.status !== "DISMISSED")
+                .sort((a, b) => b.relevance - a.relevance)
+                .slice(0, 4)
+                .map((t) => (
+                  <Link
+                    key={t.id}
+                    className="text-sm border border-[var(--border)] rounded p-3 hover:bg-[var(--muted)]"
+                    href="/intelligence"
+                  >
+                    {t.title}
+                    <span className="block mt-1 text-xs muted">
+                      {data.sources.find((s) => s.id === t.sourceId)?.name} ·
+                      실제 출처 조사 후보
+                    </span>
+                  </Link>
+                ))}
+            </div>
+          )}
+        </section>
+      )}
       <div className="flex justify-between items-center gap-3 flex-wrap mb-6">
         <div className="filter-row">
           <div className="relative">

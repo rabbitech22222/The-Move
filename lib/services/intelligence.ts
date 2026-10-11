@@ -10,7 +10,7 @@ import type {
   Topic,
 } from "../domain";
 import { safeFetch } from "../integrations/http";
-import { ServiceError } from "./errors";
+import { ServiceError, errorMessage } from "./errors";
 
 const trackers = /^(utm_.+|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid)$/i;
 const MAX_FEED_ITEMS = 100;
@@ -122,7 +122,28 @@ function channelScore(
     "verified",
     "claims",
   ]);
-  const matches = [...new Set(keywords)]
+  const editorialKeywords =
+    channel.id === "the-move"
+      ? [
+          "문화",
+          "패션",
+          "디자인",
+          "전시",
+          "영화",
+          "음악",
+          "브랜드",
+          "공간",
+          "여행",
+          "기술",
+          "인공지능",
+          "art",
+          "fashion",
+          "design",
+          "culture",
+          "music",
+        ]
+      : [];
+  const matches = [...new Set([...keywords, ...editorialKeywords])]
     .filter((word) => !ignored.has(word) && text.includes(word))
     .slice(0, 3);
   const age = publishedAt ? now.getTime() - Date.parse(publishedAt) : NaN;
@@ -173,7 +194,7 @@ async function retrieve(source: Source): Promise<RetrievedItem[]> {
   if (!response.ok)
     throw new ServiceError(
       "SOURCE_FETCH_FAILED",
-      `RSS source returned HTTP ${response.status}. Retry later or update the source URL.`,
+      `공개 RSS가 HTTP ${response.status}로 응답했습니다. 출처 URL과 RSS 제공 상태를 확인하고 잠시 후 다시 수집하세요.`,
       502,
     );
   const xml = await response.text();
@@ -235,8 +256,8 @@ export async function ingestSource(
   } catch (error) {
     const message =
       error instanceof ServiceError
-        ? error.message
-        : "Could not parse or retrieve this RSS source. Check its URL and RSS format.";
+        ? errorMessage(error)
+        : "RSS를 수집하거나 해석하지 못했습니다. 출처 URL·공개 RSS 제공 상태·네트워크를 확인하세요.";
     await mutateWorkspace(actorId, "source.ingest.failed", sourceId, (data) => {
       const current = data.sources.find((entry) => entry.id === sourceId);
       if (current) current.lastError = message;

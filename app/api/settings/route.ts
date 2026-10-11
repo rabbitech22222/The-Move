@@ -3,10 +3,19 @@ import { randomUUID } from "node:crypto";
 import { authorize, body, endpoint, HttpError, ok } from "@/lib/http";
 import { getWorkspaceData, mutateWorkspace } from "@/lib/data";
 import { credentialStatus } from "@/lib/credentials";
+import { isLocalOperation } from "@/lib/runtime";
+import { localWorkerStatus } from "@/lib/local-worker";
+import { enqueueTask } from "@/lib/jobs";
 export async function GET() {
   return endpoint(async () => {
     const user = await authorize();
     const data = await getWorkspaceData();
+    const channel = data.channels[0];
+    const latestMetric = data.accountMetrics
+      .filter((m) => m.source === "META")
+      .sort((a, b) => b.syncedAt.localeCompare(a.syncedAt))[0];
+    const latestSync = data.tasks.find((t) => t.kind === "METRICS_SYNC");
+    const local = isLocalOperation() ? await localWorkerStatus() : null;
     const [canva, meta] = await Promise.all([
       credentialStatus("canva"),
       credentialStatus("meta"),
@@ -22,6 +31,22 @@ export async function GET() {
     });
     return ok({
       demo: data.demo,
+      runtime: {
+        mode: data.demo ? "demo" : isLocalOperation() ? "local" : "database",
+        worker: local,
+      },
+      instagram: {
+        handle: "@themovemag_",
+        verified:
+          !!channel?.connected && !!channel.platformAccountId && !meta.expired,
+        accountId: channel?.platformAccountId || null,
+        lastSyncedAt: latestMetric?.syncedAt || null,
+        syncStatus: latestSync?.status || null,
+        syncMessage: latestSync?.message || null,
+        missing: !meta.configured
+          ? ["META_ACCESS_TOKEN 또는 Meta OAuth 인증"]
+          : [],
+      },
       canManageIntegrations: user.role === "ADMIN",
       operators: data.operators,
       integrations: {
@@ -56,8 +81,12 @@ export async function GET() {
           ),
         },
         redis: state(
-          !!process.env.REDIS_URL,
-          "설정 정보와 실행 상태는 별개입니다. 실제 작업 결과로 작동 여부를 확인하세요.",
+          local ? local.running : !!process.env.REDIS_URL,
+          local
+            ? local.running
+              ? "로컬 작업 처리기 실행 확인. 뉴스·제작·예약 작업은 실제 파일 대기열에 저장됩니다."
+              : "로컬 작업 처리기가 꺼져 있습니다. 기본 실행 창을 다시 열어 주세요."
+            : "설정 정보와 실행 상태는 별개입니다. 실제 작업 결과로 작동 여부를 확인하세요.",
         ),
       },
     });
@@ -84,6 +113,7 @@ export async function POST(request: Request) {
           action: z.literal("connect-meta-account"),
           channelId: z.string(),
           accountId: z.string().regex(/^\d+$/).optional(),
+          accessToken: z.string().trim().min(20).max(8192).optional(),
         }),
       ]),
     );
@@ -102,34 +132,21 @@ export async function POST(request: Request) {
         );
       const { connectTheMoveAccount } =
         await import("@/lib/integrations/the-move-account");
-      await connectTheMoveAccount(user.id, input.accountId);
+      if ((await getWorkspaceData()).demo)
+        throw new HttpError(
+          409,
+          "DEMO_PUBLISH_DISABLED",
+          "기본 실행 파일로 실제 운영 공간을 열어 주세요. 예시 모드에는 실제 계정을 연결하지 않습니다.",
+        );
+      await connectTheMoveAccount(user.id, input.accountId, input.accessToken);
+      await enqueueTask("METRICS_SYNC", { channelId: "the-move" }, user.id);
       return ok(await getWorkspaceData());
     }
     if (input.action === "create-channel")
-      return ok(
-        await mutateWorkspace(user.id, "channel.create", "new", (data) => {
-          if (
-            data.channels.some(
-              (c) =>
-                c.name.toLowerCase() === input.name.toLowerCase() ||
-                c.handle.toLowerCase() === input.handle.toLowerCase(),
-            )
-          )
-            throw new HttpError(
-              409,
-              "DUPLICATE_CHANNEL",
-              "This channel name or handle is already registered.",
-            );
-          data.channels.push({
-            id: randomUUID(),
-            name: input.name,
-            handle: input.handle,
-            accent: "#d65b4f",
-            connected: false,
-            guidelines: input.guidelines,
-            guidelineVersion: 1,
-          });
-        }),
+      throw new HttpError(
+        409,
+        "ACCOUNT_SCOPE",
+        "이 작업 공간은 @themovemag_ 전용입니다. 다른 채널은 추가하지 않습니다.",
       );
     return ok(
       await mutateWorkspace(

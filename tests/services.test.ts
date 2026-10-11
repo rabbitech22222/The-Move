@@ -5,7 +5,7 @@ import type { WorkspaceData } from "../lib/domain";
 import * as http from "../lib/integrations/http";
 import * as transport from "../lib/integrations/transport";
 import * as identity from "../lib/integrations/the-move-account";
-import { readInsight } from "../lib/integrations/meta";
+import { readInsight, syncInstagramMetrics } from "../lib/integrations/meta";
 import {
   validateCopyLayout,
   validateTemplate,
@@ -46,6 +46,7 @@ vi.mock("../lib/data", () => ({
 }));
 vi.mock("../lib/credentials", () => ({
   getIntegrationToken: vi.fn(async () => "test-token-not-a-secret"),
+  saveIntegrationToken: vi.fn(async () => {}),
 }));
 
 beforeEach(() => {
@@ -814,5 +815,76 @@ describe("direct Canva design autofill with official video fields", () => {
     expect(design.status).toBe("READY");
     expect(project.stage).toBe("REVIEW");
     expect(fixture.data!.publications).toHaveLength(0);
+  });
+});
+
+describe("Meta metric protocol remains separate from Korean display text", () => {
+  it("requests the official views field for account and post metrics and stores the returned values", async () => {
+    const data = fixture.data!;
+    data.demo = false;
+    data.accountMetrics = [];
+    data.posts = [];
+    data.postMetrics = [];
+    data.channels[0].platformAccountId = "1784101";
+    data.channels[0].connected = true;
+    const calls: string[] = [];
+    vi.spyOn(http, "officialApi").mockImplementation(async (raw) => {
+      const url = new URL(String(raw));
+      calls.push(url.toString());
+      if (url.searchParams.get("fields") === "id,username")
+        return { id: "1784101", username: "themovemag_" };
+      if (url.searchParams.get("fields") === "id,followers_count")
+        return { id: "1784101", followers_count: 500 };
+      if (url.pathname.endsWith("/media"))
+        return {
+          data: [
+            {
+              id: "media111",
+              caption: "Provider contract fixture",
+              media_type: "IMAGE",
+              timestamp: new Date(Date.now() - 60000).toISOString(),
+            },
+          ],
+        };
+      const metric = url.searchParams.get("metric");
+      const accountValues = { views: 321, reach: 221, total_interactions: 11 };
+      const postValues = {
+        views: 777,
+        reach: 600,
+        likes: 10,
+        comments: 1,
+        saved: 2,
+        shares: 3,
+      };
+      const values = url.pathname.includes("media111")
+        ? postValues
+        : accountValues;
+      if (!metric || !(metric in values))
+        throw new ServiceError(
+          "API_REJECTED",
+          "Unsupported official metric name",
+        );
+      return {
+        data: [
+          {
+            name: metric,
+            total_value: { value: values[metric as keyof typeof values] },
+          },
+        ],
+      };
+    });
+    const result = await syncInstagramMetrics("the-move", "operator-1");
+    expect(result.unavailable).toEqual([]);
+    expect(data.accountMetrics[0].views).toBe(321);
+    expect(data.postMetrics[0].views).toBe(777);
+    expect(data.accountMetrics[0].followerDelta).toBeNull();
+    expect(
+      calls.filter(
+        (url) => new URL(url).searchParams.get("metric") === "views",
+      ),
+    ).toHaveLength(2);
+    expect(calls.every((url) => !/[가-힣]/.test(decodeURIComponent(url)))).toBe(
+      true,
+    );
   });
 });

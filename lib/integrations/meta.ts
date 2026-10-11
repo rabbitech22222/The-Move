@@ -103,7 +103,7 @@ export async function syncInstagramMetrics(
   const unavailable: string[] = [];
   const values: Record<string, number | null> = {};
   // Fetch independently: unsupported metrics stay null instead of being replaced with zero.
-  for (const metric of ["조회", "reach", "total_interactions"]) {
+  for (const metric of ["views", "reach", "total_interactions"]) {
     try {
       const response = await officialApi<{ data?: Insight[] }>(
         `${base}/${accountId}/insights?metric=${metric}&period=day&metric_type=total_value&since=${start / 1000}&until=${end / 1000}`,
@@ -157,7 +157,7 @@ export async function syncInstagramMetrics(
   for (const post of media.slice(0, 20)) {
     const metrics: Record<string, number | null> = {};
     for (const metric of [
-      "조회",
+      "views",
       "reach",
       "likes",
       "comments",
@@ -187,7 +187,7 @@ export async function syncInstagramMetrics(
       id: randomUUID(),
       postId: `meta-${post.id}`,
       date,
-      views: metrics.views,
+      views: metrics.views ?? null,
       reach: metrics.reach,
       likes: metrics.likes,
       comments: metrics.comments,
@@ -224,7 +224,7 @@ export async function syncInstagramMetrics(
         date,
         followers,
         followerDelta: previous ? followers - previous.followers : null,
-        views: values.views,
+        views: values.views ?? null,
         reach: values.reach,
         engagements: values.total_interactions,
         postsPublished,

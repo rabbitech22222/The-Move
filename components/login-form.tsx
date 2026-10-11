@@ -2,8 +2,16 @@
 import { useState } from "react";
 import { ArrowUpRight, Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-export function LoginForm({ demo }: { demo: boolean }) {
-  const [email, setEmail] = useState(demo ? "operator1@themove.local" : "");
+export function LoginForm({
+  demo,
+  local = false,
+}: {
+  demo: boolean;
+  local?: boolean;
+}) {
+  const [email, setEmail] = useState(
+    demo || local ? "operator1@themove.local" : "",
+  );
   const [password, setPassword] = useState(demo ? "move-demo-2026" : "");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,9 +56,7 @@ export function LoginForm({ demo }: { demo: boolean }) {
             발견 → 제작 → 검토 → 측정
           </div>
         </div>
-        <div className="text-xs text-neutral-500">
-          THE MOVE / KOREA-CODED / THE STANDARD
-        </div>
+        <div className="text-xs text-neutral-500">THE MOVE · @themovemag_</div>
         <ArrowUpRight
           className="absolute -right-14 bottom-12 text-white/[.025]"
           size={430}
@@ -74,6 +80,12 @@ export function LoginForm({ demo }: { demo: boolean }) {
                 않았으며 아래 계정은 데모에서만 사용할 수 있습니다.
               </p>
             </div>
+          )}
+          {local && !demo && (
+            <p className="mb-5 text-sm muted">
+              초기 비밀번호는 실행 폴더의 <b>.move-local/login.txt</b>에
+              있습니다. 예시 데이터 없이 실제 작업을 저장합니다.
+            </p>
           )}
           <form onSubmit={login} className="space-y-5">
             <label className="block">

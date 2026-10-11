@@ -111,7 +111,7 @@ test("Studio creates, edits and persists a sourced project with revision and pro
     dialog.getByRole("heading", { name: "새 콘텐츠 시작" }),
   ).toBeVisible();
   await dialog.getByLabel("프로젝트 제목", { exact: true }).fill(title);
-  await dialog.getByLabel("채널", { exact: true }).selectOption("korea-coded");
+  await dialog.getByLabel("채널", { exact: true }).selectOption("the-move");
   await dialog.getByLabel("담당 운영자").selectOption("operator-2");
   await dialog.getByLabel("출처 링크").fill(source);
   await dialog
@@ -558,30 +558,31 @@ test("media references persist and edits invalidate approval until assets are hu
   expect(unsafe.status()).toBe(400);
 });
 
-test("new channels remain disconnected with no invented account metrics", async ({
+test("THE MOVE is the only account and other channel creation is rejected", async ({
   page,
 }) => {
   await login(page);
   await page.goto("/settings");
-  const name = `E2E future ${Date.now()}`;
-  await page.getByLabel("채널 이름", { exact: true }).fill(name);
-  await page
-    .getByLabel("채널 아이디", { exact: true })
-    .fill(`@future${Date.now()}`);
-  await page
-    .getByLabel("초기 편집 규칙")
-    .fill(
-      "Verify primary sources and use restrained editorial copy for this future channel.",
-    );
-  await page.getByRole("button", { name: "채널 추가", exact: true }).click();
-  await expect(page.getByText(/채널을 추가했습니다/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Instagram 계정 연결" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "채널 추가", exact: true }),
+  ).toHaveCount(0);
+  const response = await mutate(
+    page.request,
+    {
+      action: "create-channel",
+      name: "Unrequested brand",
+      handle: "@unrequested",
+      guidelines: "Unexpected additional channel",
+    },
+    "/api/settings",
+  );
+  expect(response.status()).toBe(409);
   const data = await workspace(page.request);
-  const channel = data.channels.find((c) => c.name === name)!;
-  expect(channel).toBeDefined();
-  expect(channel.connected).toBe(false);
-  expect(
-    data.accountMetrics.filter((m) => m.channelId === channel.id),
-  ).toHaveLength(0);
+  expect(data.channels.map((c) => c.id)).toEqual(["the-move"]);
+  expect(data.channels[0].handle).toBe("@themovemag_");
 });
 
 test("manual Canva copies are recorded for review without inventing an API success", async ({

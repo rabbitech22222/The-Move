@@ -5,7 +5,7 @@ if ! command -v node >/dev/null 2>&1; then
   read -r -p "Press Enter to close..." answer
   exit 1
 fi
-node scripts/start-demo.mjs
+node scripts/start-local.mjs
 result=$?
 if [ "$result" -ne 0 ]; then
   read -r -p "Press Enter to close..." answer

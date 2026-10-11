@@ -28,6 +28,13 @@ type Integration = {
   oauthReady?: boolean;
 };
 type SettingsData = {
+  instagram?: {
+    verified: boolean;
+    lastSyncedAt: string | null;
+    syncStatus: string | null;
+    syncMessage: string | null;
+    missing: string[];
+  };
   demo: boolean;
   canManageIntegrations?: boolean;
   integrations: Record<"openai" | "canva" | "meta" | "redis", Integration>;
@@ -80,14 +87,8 @@ export function Settings() {
   const [guidelines, setGuidelines] = useState("");
   const [accountChannelId, setAccountChannelId] = useState("the-move");
   const [accountId, setAccountId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const [accountBusy, setAccountBusy] = useState<string | null>(null);
-  const [newChannelName, setNewChannelName] = useState("");
-  const [newChannelHandle, setNewChannelHandle] = useState("");
-  const [newChannelGuidelines, setNewChannelGuidelines] = useState("");
-  const [channelFeedback, setChannelFeedback] = useState<{
-    text: string;
-    failed: boolean;
-  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{
     text: string;
@@ -123,6 +124,9 @@ export function Settings() {
       setGuidelines(data.channels[0].guidelines);
     }
   }, [data, channelId]);
+  useEffect(() => {
+    if (data) void loadConfiguration();
+  }, [data?.tasks[0]?.updatedAt, data?.channels[0]?.connected]);
   function appearance(value: string) {
     setTheme(value);
     localStorage.setItem("move-theme", value);
@@ -150,6 +154,7 @@ export function Settings() {
       setNotice({ text: message, failed: false });
       if (endpoint === "/api/settings") {
         setAccountId("");
+        setAccessToken("");
         void loadConfiguration();
       }
     } catch (err) {
@@ -158,32 +163,6 @@ export function Settings() {
           err instanceof Error
             ? err.message
             : "계정 작업을 완료하지 못했습니다.",
-        failed: true,
-      });
-    } finally {
-      setAccountBusy(null);
-    }
-  }
-  async function createChannel() {
-    setAccountBusy("create-channel");
-    setChannelFeedback(null);
-    try {
-      await mutate("/api/settings", {
-        action: "create-channel",
-        name: newChannelName.trim(),
-        handle: newChannelHandle.trim(),
-        guidelines: newChannelGuidelines.trim(),
-      });
-      setNewChannelName("");
-      setNewChannelHandle("");
-      setNewChannelGuidelines("");
-      setChannelFeedback({
-        text: "채널을 추가했습니다. 지표 수집 전 계정을 인증하고 디자인 제작 전 승인된 템플릿을 등록하세요.",
-        failed: false,
-      });
-    } catch (err) {
-      setChannelFeedback({
-        text: err instanceof Error ? err.message : "채널을 만들지 못했습니다.",
         failed: true,
       });
     } finally {
@@ -352,90 +331,6 @@ export function Settings() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2 className="font-semibold">채널 추가</h2>
-            <p className="mt-1 text-xs muted">
-              브랜드별 편집 기준을 가진 새 채널을 추가합니다.
-            </p>
-          </div>
-          <Badge>관리자 전용</Badge>
-        </div>
-        <form
-          className="space-y-4 p-5 pt-0"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void createChannel();
-          }}
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <label>
-              <span className="field-label">채널 이름</span>
-              <input
-                className="input"
-                required
-                minLength={1}
-                maxLength={100}
-                placeholder="브랜드 또는 매체 이름"
-                value={newChannelName}
-                onChange={(e) => setNewChannelName(e.target.value)}
-              />
-            </label>
-            <label>
-              <span className="field-label">채널 아이디</span>
-              <input
-                className="input"
-                required
-                minLength={1}
-                maxLength={100}
-                placeholder="@yourchannel"
-                value={newChannelHandle}
-                onChange={(e) => setNewChannelHandle(e.target.value)}
-              />
-            </label>
-          </div>
-          <label className="block">
-            <span className="field-label">초기 편집 규칙</span>
-            <textarea
-              className="input min-h-24 w-full"
-              required
-              minLength={10}
-              maxLength={10000}
-              placeholder="채널의 문체, 출처 기준과 편집 우선순위를 작성하세요."
-              value={newChannelGuidelines}
-              onChange={(e) => setNewChannelGuidelines(e.target.value)}
-            />
-          </label>
-          {channelFeedback && (
-            <p
-              role={channelFeedback.failed ? "alert" : "status"}
-              className={`text-xs leading-relaxed ${channelFeedback.failed ? "text-red-600" : "muted"}`}
-            >
-              {channelFeedback.text}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs muted">
-              새 채널은 연결 전 상태입니다. 인증 후 동기화해야 계정 지표가
-              표시됩니다.
-            </p>
-            <Button
-              type="submit"
-              disabled={
-                !!accountBusy ||
-                !configuration?.canManageIntegrations ||
-                !newChannelName.trim() ||
-                !newChannelHandle.trim() ||
-                newChannelGuidelines.trim().length < 10
-              }
-            >
-              <Plus size={14} />
-              {accountBusy === "create-channel" ? "추가 중…" : "채널 추가"}
-            </Button>
-          </div>
-        </form>
-      </section>
-      <section className="panel">
-        <div className="panel-header">
-          <div>
             <h2 className="font-semibold">Instagram 계정 연결</h2>
             <p className="mt-2 text-sm">
               연결 및 게시 대상: <strong>@themovemag_</strong>
@@ -466,6 +361,84 @@ export function Settings() {
             </p>
           </div>
           <Badge>관리자 연결</Badge>
+        </div>
+        <div className="p-5 border-t border-[var(--border)] space-y-3">
+          <p className="text-sm">
+            <strong>
+              {configuration?.instagram?.verified
+                ? "@themovemag_ 계정 확인 완료"
+                : "@themovemag_ 실제 인증 미완료"}
+            </strong>
+          </p>
+          <p className="text-xs muted">
+            지표 동기화:{" "}
+            {configuration?.instagram?.lastSyncedAt
+              ? new Date(configuration.instagram.lastSyncedAt).toLocaleString(
+                  "ko-KR",
+                  { timeZone: "Asia/Seoul" },
+                )
+              : "받은 실제 지표 없음"}
+            . {configuration?.instagram?.syncMessage}
+          </p>
+          {!configuration?.integrations.meta.configured && (
+            <p className="text-sm muted">
+              이 서버에 Meta 인증 정보가 없습니다. GPT 플러그인 인증이 전달되지
+              않았습니다. Meta OAuth를 설정하거나 정당한 관리 권한으로 발급한
+              액세스 토큰을 아래에서 연결하세요. 뉴스·편집 작업은 인증 전에도
+              가능합니다.
+            </p>
+          )}
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await accountAction(
+                  "/api/settings",
+                  {
+                    action: "connect-meta-account",
+                    channelId: "the-move",
+                    ...(accountId.trim()
+                      ? { accountId: accountId.trim() }
+                      : {}),
+                    accessToken: accessToken.trim(),
+                  },
+                  "token-connect",
+                  "@themovemag_ 실제 계정을 확인했습니다. 지표 수집 결과가 자동으로 갱신됩니다.",
+                );
+              } finally {
+                setAccessToken("");
+              }
+            }}
+          >
+            <label className="block">
+              <span className="field-label">
+                Meta 액세스 토큰 · 서버 암호화 저장
+              </span>
+              <input
+                type="password"
+                autoComplete="off"
+                className="input mt-2 w-full"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                placeholder="관리 권한이 있는 공식 Meta 토큰"
+              />
+            </label>
+            <p className="text-xs muted">
+              토큰은 계정 이름과 ID를 실제 API로 확인한 후 저장합니다. 다른
+              계정은 거부합니다. 이 입력값은 브라우저 저장소·감사 로그에
+              저장하지 않습니다.
+            </p>
+            <Button
+              disabled={
+                !!accountBusy ||
+                accessToken.trim().length < 20 ||
+                !configuration?.canManageIntegrations
+              }
+            >
+              THE MOVE 인증·지표 수집
+            </Button>
+          </form>
         </div>
         <div className="divide-y divide-[var(--border)]">
           {data.channels

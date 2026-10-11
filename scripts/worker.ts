@@ -9,10 +9,12 @@ import {
   registerRecurringJobs,
   type QueuePayload,
 } from "../lib/jobs";
+import { prepareNewsQueue } from "../lib/local-worker";
 import { ServiceError } from "../lib/services/errors";
 
 async function main() {
   await registerRecurringJobs();
+  if (process.env.DEMO_MODE !== "true") await prepareNewsQueue();
   const worker = new Worker<QueuePayload>(
     QUEUE_NAME,
     async (job) => {

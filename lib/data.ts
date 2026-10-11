@@ -11,8 +11,15 @@ import {
 import path from "node:path";
 import type { Prisma } from "@prisma/client";
 import type { WorkspaceData, Operator } from "./domain";
-import { createDemoData, demoOperators, WORKSPACE_ID } from "./demo";
+import {
+  createDemoData,
+  createWorkspaceBase,
+  demoOperators,
+  WORKSPACE_ID,
+} from "./demo";
 import { prisma } from "./prisma";
+import { usesLocalFiles, isLocalOperation } from "./runtime";
+import { restrictToTheMove } from "./single-channel";
 
 type Transaction = Prisma.TransactionClient;
 type AuthUser = Operator & { passwordHash: string };
@@ -44,8 +51,10 @@ async function serialized<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-async function withDemoFileLock<T>(fn: () => Promise<T>): Promise<T> {
-  const filename = dataFile();
+export async function withLocalFileLock<T>(
+  fn: () => Promise<T>,
+  filename = dataFile(),
+): Promise<T> {
   await mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
   const lock = `${filename}.lock`;
   const token = `${process.pid}:${randomUUID()}`;
@@ -81,7 +90,7 @@ async function withDemoFileLock<T>(fn: () => Promise<T>): Promise<T> {
       }
       if (Date.now() >= deadline)
         throw new Error(
-          "Demo data is busy. Another process still holds the persistence lock; retry after its task finishes.",
+          "저장 중인 작업이 있습니다. 다른 처리기의 작업이 끝난 후 다시 시도하세요.",
         );
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
@@ -110,7 +119,7 @@ async function readDemo(): Promise<WorkspaceData> {
       await readFile(dataFile(), "utf8"),
     ) as WorkspaceData;
     if (
-      data.demo !== true ||
+      data.demo !== !isLocalOperation() ||
       !Array.isArray(data.channels) ||
       !Array.isArray(data.projects)
     ) {
@@ -135,10 +144,16 @@ async function readDemo(): Promise<WorkspaceData> {
     if (data.assets === undefined) data.assets = [];
     if (!Array.isArray(data.assets))
       throw new Error("Invalid demo assets. Existing data was preserved.");
-    return data;
+    return restrictToTheMove(data);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    const data = createDemoData();
+    const data = isLocalOperation()
+      ? createWorkspaceBase(false)
+      : createDemoData();
+    if (isLocalOperation())
+      data.operators = (await localUsers()).map(
+        ({ passwordHash: _hash, ...user }) => user,
+      );
     await writeDemo(data);
     return data;
   }
@@ -723,15 +738,18 @@ export async function persistWorkspace(
 }
 
 export async function getWorkspaceData(): Promise<WorkspaceData> {
-  if (isDemo()) return serialized(() => withDemoFileLock(readDemo));
+  if (usesLocalFiles()) return serialized(() => withLocalFileLock(readDemo));
   if (!process.env.DATABASE_URL)
     throw new Error(
       "DATABASE_URL is required. To use explicitly labeled local fixtures, set DEMO_MODE=true.",
     );
-  return prisma.$transaction((tx) => readDatabase(tx), {
-    isolationLevel: "RepeatableRead",
-    timeout: 30_000,
-  });
+  return prisma.$transaction(
+    async (tx) => restrictToTheMove(await readDatabase(tx)),
+    {
+      isolationLevel: "RepeatableRead",
+      timeout: 30_000,
+    },
+  );
 }
 
 export async function mutateWorkspace(
@@ -746,7 +764,9 @@ export async function mutateWorkspace(
       !data.operators.some((operator) => operator.id === actorId)
     )
       throw new Error("Unknown workspace actor.");
+    restrictToTheMove(data);
     await mutation(data);
+    restrictToTheMove(data);
     data.audit.unshift({
       id: randomUUID(),
       actorId,
@@ -757,9 +777,9 @@ export async function mutateWorkspace(
     });
     return data;
   };
-  if (isDemo())
+  if (usesLocalFiles())
     return serialized(() =>
-      withDemoFileLock(async () => {
+      withLocalFileLock(async () => {
         const data = await apply(await readDemo());
         await writeDemo(data);
         return data;
@@ -793,6 +813,10 @@ export async function findUserByEmail(email: string): Promise<AuthUser | null> {
       ? { ...operator, passwordHash: hashPassword("move-demo-2026") }
       : null;
   }
+  if (isLocalOperation())
+    return (
+      (await localUsers()).find((user) => user.email === normalized) ?? null
+    );
   if (!process.env.DATABASE_URL) return null;
   return prisma.user.findFirst({
     where: { workspaceId: WORKSPACE_ID, email: normalized, isSystem: false },
@@ -808,9 +832,48 @@ export async function findUserByEmail(email: string): Promise<AuthUser | null> {
 
 export async function getOperatorById(id: string): Promise<Operator | null> {
   if (isDemo()) return demoOperators.find((user) => user.id === id) ?? null;
+  if (isLocalOperation()) {
+    const user = (await localUsers()).find((user) => user.id === id);
+    if (!user) return null;
+    const { passwordHash: _hash, ...operator } = user;
+    return operator;
+  }
   if (!process.env.DATABASE_URL) return null;
   return prisma.user.findFirst({
     where: { id, workspaceId: WORKSPACE_ID, isSystem: false },
     select: { id: true, name: true, email: true, role: true },
   });
+}
+
+async function localUsers(): Promise<AuthUser[]> {
+  const filename = path.join(path.dirname(dataFile()), "users.json");
+  return withLocalFileLock(async () => {
+    try {
+      return JSON.parse(await readFile(filename, "utf8"));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    const passwords = [
+      process.env.OPERATOR_1_PASSWORD,
+      process.env.OPERATOR_2_PASSWORD,
+    ];
+    if (
+      passwords.some((p) => !p || p.length < 12) ||
+      passwords[0] === passwords[1]
+    )
+      throw new Error(
+        "로컬 운영 계정의 서로 다른 12자 이상 비밀번호가 필요합니다. 기본 실행기로 보안 설정을 준비하세요.",
+      );
+    const users = demoOperators.map((user, index) => ({
+      ...user,
+      email: (
+        process.env[`OPERATOR_${index + 1}_EMAIL`] || user.email
+      ).toLowerCase(),
+      passwordHash: hashPassword(passwords[index]!),
+    }));
+    const temporary = `${filename}.${randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(users), { mode: 0o600 });
+    await rename(temporary, filename);
+    return users;
+  }, filename);
 }

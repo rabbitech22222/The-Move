@@ -8,7 +8,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-node scripts\start-demo.mjs
+node scripts\start-local.mjs
 set "MOVE_EXIT_CODE=%errorlevel%"
 if not "%MOVE_EXIT_CODE%"=="0" (
   echo.

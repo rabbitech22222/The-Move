@@ -2,6 +2,8 @@ import { providerFetch } from "@/lib/integrations/transport";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
+import { withLocalFileLock } from "./data";
+import { usesLocalFiles } from "./runtime";
 import { prisma } from "@/lib/prisma";
 export type Provider = "canva" | "meta";
 interface Credential {
@@ -65,15 +67,17 @@ export async function saveIntegrationToken(
       ? new Date(Date.now() + expiresIn * 1000).toISOString()
       : null,
   };
-  if (process.env.DEMO_MODE === "true") {
-    const save = writeChain.then(async () => {
-      const data = await readLocal();
-      data[provider] = record;
-      await mkdir(path.dirname(file()), { recursive: true });
-      const temporary = `${file()}.${randomBytes(6).toString("hex")}.tmp`;
-      await writeFile(temporary, JSON.stringify(data), { mode: 0o600 });
-      await rename(temporary, file());
-    });
+  if (usesLocalFiles()) {
+    const save = writeChain.then(() =>
+      withLocalFileLock(async () => {
+        const data = await readLocal();
+        data[provider] = record;
+        await mkdir(path.dirname(file()), { recursive: true });
+        const temporary = `${file()}.${randomBytes(6).toString("hex")}.tmp`;
+        await writeFile(temporary, JSON.stringify(data), { mode: 0o600 });
+        await rename(temporary, file());
+      }, file()),
+    );
     writeChain = save.catch(() => {});
     await save;
   } else {
@@ -93,8 +97,7 @@ export async function saveIntegrationToken(
   }
 }
 async function stored(provider: Provider): Promise<Credential | null> {
-  if (process.env.DEMO_MODE === "true")
-    return (await readLocal())[provider] || null;
+  if (usesLocalFiles()) return (await readLocal())[provider] || null;
   const value = await prisma.integrationCredential.findUnique({
     where: { workspaceId_provider: { workspaceId: "the-move", provider } },
   });

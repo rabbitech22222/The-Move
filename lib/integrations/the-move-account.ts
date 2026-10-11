@@ -1,4 +1,4 @@
-import { getIntegrationToken } from "../credentials";
+import { getIntegrationToken, saveIntegrationToken } from "../credentials";
 import { getWorkspaceData, mutateWorkspace } from "../data";
 import { ServiceError } from "../services/errors";
 import { officialApi } from "./http";
@@ -33,8 +33,10 @@ export async function verifyTheMoveAccount(accountId: string, token: string) {
 export async function connectTheMoveAccount(
   actorId: string,
   accountId?: string,
+  suppliedToken?: string,
+  expiresIn?: number,
 ) {
-  const token = await getIntegrationToken("meta");
+  const token = suppliedToken || (await getIntegrationToken("meta"));
   if (!token)
     throw new ServiceError(
       "DISCONNECTED",
@@ -86,6 +88,8 @@ export async function connectTheMoveAccount(
     accountId = [...matches][0];
   }
   const account = await verifyTheMoveAccount(accountId, token);
+  if (suppliedToken)
+    await saveIntegrationToken("meta", suppliedToken, undefined, expiresIn);
   await mutateWorkspace(
     actorId,
     "META_ACCOUNT_IDENTITY_VERIFIED",

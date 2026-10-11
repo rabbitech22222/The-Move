@@ -109,8 +109,7 @@ export function Shell({
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold">편집 작업 공간</div>
             <div className="text-[9px] muted mt-0.5">
-              {data?.operators.length ?? 2} 명 운영자 ·{" "}
-              {data?.channels.length ?? 3} 개 브랜드
+              {data?.operators.length ?? 2} 명 운영자 · THE MOVE 전용
             </div>
           </div>
           <Command size={12} className="muted" />

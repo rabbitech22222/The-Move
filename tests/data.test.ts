@@ -26,7 +26,7 @@ describe("explicit demo persistence", () => {
   it("labels every mock metric and keeps agents idle until real work is requested", () => {
     const data = createDemoData(new Date("2026-10-10T12:00:00Z"));
     expect(data.demo).toBe(true);
-    expect(data.accountMetrics).toHaveLength(270);
+    expect(data.accountMetrics).toHaveLength(90);
     expect(
       data.accountMetrics.every((metric) => metric.source === "DEMO"),
     ).toBe(true);

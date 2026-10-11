@@ -1,6 +1,6 @@
 # THE MOVE OS
 
-THE MOVE의 정보 수집, 편집, Canva 제작과 Instagram 게시를 관리하는 작업 공간입니다. 화면 언어는 한국어이며 날짜는 한국 표준시로 표시합니다. 실제 Instagram 연동·게시 대상은 **@themovemag_**입니다. 다른 브랜드의 편집 프로젝트는 유지하되 실제 계정 연동은 현재 THE MOVE에 집중합니다.
+THE MOVE의 정보 수집, 편집, Canva 제작과 Instagram 게시를 관리하는 작업 공간입니다. 화면 언어는 한국어이며 날짜는 한국 표준시로 표시합니다. 실제 Instagram 연동·게시 대상은 **@themovemag\_**입니다. 다른 브랜드는 화면과 운영 데이터에서 제거하며 추가 채널 생성도 차단합니다.
 
 **발견 → 조사 → 평가 → 초안 → 디자인 → 검토 → 승인 → 게시 → 분석**
 
@@ -10,22 +10,23 @@ Next.js 16, React 19, TypeScript, Tailwind 4, Radix 기반 shadcn 스타일 컴�
 
 Node.js 24 이상이 필요합니다. ZIP 압축을 풀고 다음 파일을 실행하세요.
 
-| 실행 목적 | Windows | Mac |
-|---|---|---|
-| 외부 인증 없이 데모 보기 | START-WINDOWS.bat | START-MAC.command |
-| 실제 계정 인증 및 게시 | START-LIVE-WINDOWS.bat | START-LIVE-MAC.command |
+| 실행 목적                                | Windows                | Mac                    |
+| ---------------------------------------- | ---------------------- | ---------------------- |
+| 실제 뉴스·편집·계정 연동 (Docker 불필요) | START-WINDOWS.bat      | START-MAC.command      |
+| PostgreSQL + Redis 운영 (Docker 필요)    | START-LIVE-WINDOWS.bat | START-LIVE-MAC.command |
 
-데모 실행기는 설치 진행 로그와 경과 시간을 표시하고 로그인·데이터 요청을 확인한 뒤 브라우저를 엽니다. 중단된 설치는 재시도하며 성공한 설치는 재사용합니다. 실제 운영 실행기는 Docker Desktop이 필요하며 데이터베이스·앱·예약 게시 작업 처리기를 함께 실행합니다. 실제 운영의 계정 비밀번호와 인증 정보는 별도 `.env.live`에서 관리합니다.
+기본 실행기는 **실제 로컬 운영**을 시작합니다. 보안 설정 `.env.desktop`, 실제 작업 `.move-local`, 초기 로그인 정보 `.move-local/login.txt`를 준비합니다. 기사·지표를 만들어 넣지 않습니다. 공개 RSS 3곳을 실제 수집하고 화면의 제작 후보에서 출처가 있는 조사 준비서를 스튜디오에 저장할 수 있습니다. Instagram 인증과 OpenAI 키는 이 과정의 필수 조건이 아닙니다.
+
+설정에서 Meta 인증 또는 정당한 권한으로 발급한 토큰을 연결하면 @themovemag\_ 이름·ID를 API로 검증한 뒤 실제 지표 수집을 요청합니다. 인증 없이 연결됨으로 표시하지 않습니다. 작업 처리기는 파일 잠금·작업 점유·재시도·실제 상태 기록을 사용하며 기본 실행 창이 열려 있어야 동작합니다. 예약과 불명확한 게시 응답은 기존 승인·중복 방지 조건을 유지합니다.
+
+고급 운영 실행기는 `.env.live`와 Docker 프로젝트를 사용합니다. 로컬 파일 모드와 데이터베이스 모드는 별도 저장소이며 자동으로 전환·병합하지 않습니다.
 
 [처음 실행 안내](START-HERE.md) · [실제 Canva 및 Instagram 게시 안내](docs/REAL_PUBLISH_KO.md)
 
-### 개발용 데모 직접 실행
+### 예시 화면을 명시적으로 실행
 
 ```sh
-npm ci
-npm run setup:local
-npm run db:generate
-npm run dev
+node scripts/start-local.mjs --demo
 ```
 
 본인 컴퓨터에서 실행한 뒤 `http://localhost:3000`으로 접속합니다. 데모 로그인 필드는 미리 입력됩니다. `operator1@themove.local` 또는 `operator2@themove.local` / `move-demo-2026`은 DEMO_MODE=true에서만 사용되는 공개 예시 계정입니다. 실제 운영 계정 비밀번호는 별도로 생성됩니다.
@@ -58,6 +59,7 @@ Canva 결과물을 페이지별 PNG 또는 릴스 MP4로 내보내고 스튜디�
 ## 검증
 
 ```sh
+node scripts/check-real-workflow.mjs # 실제 기본 실행 앱을 켠 상태에서 RSS → 후보 → 편집 검증
 npm run typecheck
 npm test
 npm run build

@@ -85,6 +85,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       if (timer.current) clearTimeout(timer.current);
     };
   }, [refresh]);
+  useEffect(() => {
+    const pending = data?.tasks.some(
+      (t) => t.status === "QUEUED" || t.status === "RUNNING",
+    );
+    const interval = setInterval(
+      () => {
+        if (document.visibilityState === "visible") void refresh();
+      },
+      pending ? 3000 : 15000,
+    );
+    return () => clearInterval(interval);
+  }, [data?.tasks, refresh]);
   return (
     <Context.Provider value={{ data, loading, error, refresh, mutate, notice }}>
       {children}

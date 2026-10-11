@@ -1,3 +1,4 @@
+import { defaultNewsSources } from "./news-sources";
 import type { WorkspaceData, Channel } from "./domain";
 
 export const WORKSPACE_ID = "the-move";
@@ -28,26 +29,6 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
         "명확한 편집 관점으로 시작합니다. 사실 주장에는 출처를 표기합니다. 간결한 제목과 THE MOVE 브랜드를 유지합니다. 릴스는 DAHPcvVkH8k의 가로 영상 배치만 사용합니다.",
       guidelineVersion: 1,
     },
-    {
-      id: "korea-coded",
-      name: "Korea-coded",
-      handle: "@koreacoded",
-      accent: "#6366f1",
-      connected: false,
-      guidelines:
-        "맥락과 함께 한국 문화를 설명합니다. 표기, 날짜와 출처를 검증하고 일부 유행을 보편적 현상으로 단정하지 않습니다.",
-      guidelineVersion: 1,
-    },
-    {
-      id: "the-standard",
-      name: "The Standard",
-      handle: "@thestandard",
-      accent: "#10b981",
-      connected: false,
-      guidelines:
-        "정확하고 절제된 표현을 사용합니다. 사실과 의견을 구분하고 가능한 한 1차 출처를 포함합니다.",
-      guidelineVersion: 1,
-    },
   ];
   return {
     demo,
@@ -57,7 +38,7 @@ export function createWorkspaceBase(demo: boolean): WorkspaceData {
     accountMetrics: [],
     posts: [],
     postMetrics: [],
-    sources: [],
+    sources: demo ? [] : defaultNewsSources(),
     topics: [],
     projects: [],
     templates: [
@@ -208,7 +189,7 @@ export function createDemoData(now = new Date()): WorkspaceData {
     confidence: "LOW",
     scoreExplanation:
       "예시 점수입니다. 실제 점수는 키워드 일치와 최신성을 기준으로 산정하며 가중치를 설명합니다.",
-    recommendedChannelId: data.channels[index].id,
+    recommendedChannelId: "the-move",
     format: "CAROUSEL",
     status: "INBOX",
     uncertainClaims: [
@@ -234,7 +215,7 @@ export function createDemoData(now = new Date()): WorkspaceData {
     {
       id: "demo-project-2",
       title: "예시 · 작은 공간의 큰 이야기",
-      channelId: "korea-coded",
+      channelId: "the-move",
       operatorId: "operator-2",
       stage: "RESEARCH",
       format: "CAROUSEL",
@@ -249,7 +230,7 @@ export function createDemoData(now = new Date()): WorkspaceData {
     {
       id: "demo-project-3",
       title: "예시 · 좋은 디자인의 확산",
-      channelId: "the-standard",
+      channelId: "the-move",
       operatorId: "operator-1",
       stage: "DRAFT",
       format: "CAROUSEL",
@@ -278,7 +259,7 @@ export function createDemoData(now = new Date()): WorkspaceData {
     {
       id: "demo-project-5",
       title: "예시 · 관점이 담긴 사물",
-      channelId: "the-standard",
+      channelId: "the-move",
       operatorId: "operator-2",
       stage: "REVIEW",
       format: "CAROUSEL",

@@ -127,6 +127,13 @@ export interface GeneratedDesign {
   createdAt: string;
 }
 export interface AgentTask {
+  localJob?: {
+    input: unknown;
+    dueAt: number;
+    attempts: number;
+    leasePid?: number;
+    leaseUntil?: number;
+  };
   id: string;
   agent: AgentName;
   kind: string;

@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { koreanLabel } from "@/lib/korean";
 
 import { useMemo, useState } from "react";
@@ -41,6 +42,7 @@ function date(value: string | null) {
 }
 
 export function Intelligence() {
+  const router = useRouter();
   const { data, loading, mutate, refresh } = useWorkspace();
   const [search, setSearch] = useState("");
   const [channel, setChannel] = useState("all");
@@ -58,14 +60,20 @@ export function Intelligence() {
   } | null>(null);
   const topics = useMemo(
     () =>
-      data?.topics.filter(
-        (t) =>
-          (status === "all" || t.status === status) &&
-          (channel === "all" || t.recommendedChannelId === channel) &&
-          `${t.title} ${t.category}`
-            .toLowerCase()
-            .includes(search.toLowerCase()),
-      ) ?? [],
+      data?.topics
+        .filter(
+          (t) =>
+            (status === "all" || t.status === status) &&
+            (channel === "all" || t.recommendedChannelId === channel) &&
+            `${t.title} ${t.category}`
+              .toLowerCase()
+              .includes(search.toLowerCase()),
+        )
+        .sort((a, b) =>
+          (b.publishedAt || b.retrievedAt).localeCompare(
+            a.publishedAt || a.retrievedAt,
+          ),
+        ) ?? [],
     [data, search, channel, status],
   );
 
@@ -93,37 +101,11 @@ export function Intelligence() {
   }
 
   async function fetchSources() {
-    const sources = data?.sources.filter((source) => source.enabled) || [];
-    if (!sources.length) {
-      setNotice({
-        text: "수집 전 접근 권한이 있는 출처를 추가하세요. 데모 출처는 수집이 꺼져 있습니다.",
-        failed: true,
-      });
-      return;
-    }
-    setBusy("ingest");
-    setNotice(null);
-    let queued = 0;
-    try {
-      for (const source of sources) {
-        await mutate("/api/intelligence", {
-          action: "ingest",
-          sourceId: source.id,
-        });
-        queued++;
-      }
-      setNotice({
-        text: `출처 수집 ${queued}건을 대기열에 추가했습니다. 오피스의 발견 담당 작업을 확인한 뒤 수신함을 새로고침하세요.`,
-        failed: false,
-      });
-    } catch (err) {
-      setNotice({
-        text: `${queued ? `출처 수집 ${queued}건을 대기열에 추가했습니다. ` : ""}${err instanceof Error ? err.message : "출처 수집을 대기열에 추가하지 못했습니다."}`,
-        failed: true,
-      });
-    } finally {
-      setBusy(null);
-    }
+    await action(
+      "ingest",
+      { action: "refresh-news" },
+      "실제 뉴스 수집을 요청했습니다. 결과는 자동 갱신되며 출처별 실패도 표시합니다.",
+    );
   }
   if (loading) return <WorkspaceLoading />;
   if (!data) return <WorkspaceError />;
@@ -177,6 +159,98 @@ export function Intelligence() {
           description="접근 권한이 있는 RSS와 제출 자료"
         />
       </div>
+      <section className="panel p-5" aria-label="제작 후보">
+        <h2 className="font-semibold">
+          {data.demo ? "예시 제작 후보" : "실제 뉴스 기반 제작 후보"}
+        </h2>
+        <p className="text-xs muted mt-1">
+          THE MOVE 관심 키워드와 최신성으로 정렬했습니다. 사실 확인 전 후보이며
+          성과 예측이 아닙니다. Instagram 연결 없이도 조사·편집을 시작할 수
+          있습니다.
+        </p>
+        <div className="grid gap-3 mt-4 md:grid-cols-2 xl:grid-cols-3">
+          {data.topics
+            .filter(
+              (t) =>
+                t.status !== "DISMISSED" &&
+                !data.projects.some((p) => p.sourceUrls.includes(t.sourceUrl)),
+            )
+            .sort(
+              (a, b) =>
+                b.relevance - a.relevance ||
+                (b.publishedAt || b.retrievedAt).localeCompare(
+                  a.publishedAt || a.retrievedAt,
+                ),
+            )
+            .slice(0, 6)
+            .map((topic) => (
+              <article
+                key={topic.id}
+                className="border border-[var(--border)] rounded-lg p-4 flex flex-col gap-3"
+              >
+                <p className="text-xs muted">
+                  {data.sources.find((s) => s.id === topic.sourceId)?.name} ·{" "}
+                  {date(topic.publishedAt)}
+                </p>
+                <h3 className="text-sm font-semibold leading-relaxed">
+                  {topic.title}
+                </h3>
+                <p className="text-xs muted">
+                  선정 점수 {topic.relevance}/100 ·{" "}
+                  {koreanLabel(topic.confidence)} 근거
+                </p>
+                <details className="text-xs muted">
+                  <summary className="cursor-pointer">
+                    선정 이유·확인할 사항
+                  </summary>
+                  <p className="mt-2">{topic.scoreExplanation}</p>
+                  <p className="mt-2">{topic.uncertainClaims.join(" ")}</p>
+                </details>
+                <div className="flex gap-3 items-center mt-auto">
+                  <a
+                    href={topic.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs underline"
+                  >
+                    원문 확인
+                  </a>
+                  <Button
+                    size="sm"
+                    disabled={!!busy}
+                    onClick={async () => {
+                      if (
+                        await action(
+                          topic.id,
+                          {
+                            action: "create-project",
+                            topicId: topic.id,
+                            format: "CAROUSEL",
+                          },
+                          "실제 출처와 조사 준비서를 스튜디오에 저장했습니다.",
+                        )
+                      )
+                        router.push("/studio");
+                    }}
+                  >
+                    조사·제작 시작
+                  </Button>
+                </div>
+              </article>
+            ))}
+        </div>
+        {!data.topics.length && (
+          <p className="text-sm muted mt-4">
+            {data.tasks.some(
+              (t) =>
+                t.kind === "NEWS_INGEST" &&
+                ["QUEUED", "RUNNING"].includes(t.status),
+            )
+              ? "공개 RSS 수집 중입니다. 실제 결과가 들어오면 자동으로 표시합니다."
+              : "수집된 뉴스가 없습니다. 출처 수집을 실행하고 아래 출처별 결과를 확인하세요."}
+          </p>
+        )}
+      </section>
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
         <section className="panel min-w-0 overflow-hidden">
           <div className="panel-header flex flex-wrap items-center justify-between gap-3">
@@ -325,7 +399,6 @@ export function Intelligence() {
                       {topic.uncertainClaims.length > 0 && (
                         <p className="mt-2 text-[11px] muted">
                           {topic.uncertainClaims.length} 개 불확실한 주장
-                          {topic.uncertainClaims.length === 1 ? "" : "s"}
                         </p>
                       )}
                     </td>
@@ -538,7 +611,7 @@ export function Intelligence() {
                     action(
                       selected.id,
                       { action: "research", topicId: selected.id },
-                      "조사 작업을 대기열에 추가했습니다. 오피스에서 결과를 확인하세요.",
+                      "스튜디오에 출처와 조사 준비서를 저장했습니다. AI가 연결되어 있으면 초안 작업도 실행합니다.",
                     )
                   }
                 >

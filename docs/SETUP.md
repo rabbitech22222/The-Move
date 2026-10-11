@@ -4,7 +4,7 @@
 
 ## 환경과 설치
 
-Node.js 24, npm을 사용합니다. 전체 개발 환경과 실제 운영 실행기에는 Docker Desktop 또는 Docker Compose가 필요합니다. 기존 격리 체크아웃을 사용하며 요청 없이 별도 Git 작업 트리를 만들지 않습니다.
+Node.js 24, npm을 사용합니다. 기본 실제 로컬 운영은 Docker 없이 실행됩니다. PostgreSQL 운영에는 Docker Desktop 또는 Docker Compose가 필요합니다. 기존 격리 체크아웃을 사용하며 요청 없이 별도 Git 작업 트리를 만들지 않습니다.
 
 ```sh
 npm ci
@@ -15,9 +15,15 @@ npm run dev
 
 setup:local은 기존 `.env`를 보존하고 새 파일에 임의 세션·암호화 키를 생성합니다. `.env*`, `.move-data`, `.move-runtime`은 버전 관리에서 제외됩니다. 모든 변경 요청에는 로그인과 APP_URL과 일치하는 Origin이 필요합니다. 세션은 12시간 후 만료되며 HTTPS 환경에서는 보안 쿠키를 사용합니다.
 
-Windows 데모 실행기는 npm-cli.js를 Node로 직접 실행해 shell=true 경고를 피합니다. 패키지 설치는 진행 로그와 10초마다 경과 시간을 표시합니다. 설치 중단 시 완료 기록을 남기지 않아 재시도하며, 성공한 동일 잠금 파일의 설치는 재사용합니다. 의존성 라이프사이클 스크립트 대신 Prisma JavaScript 클라이언트를 명시적으로 생성합니다. TLS 및 패키지 무결성 확인은 유지합니다.
+Windows 기본 실행기는 npm-cli.js를 Node로 직접 실행해 shell=true 경고를 피합니다. 패키지 설치는 진행 로그와 10초마다 경과 시간을 표시합니다. 설치 중단 시 완료 기록을 남기지 않아 재시도하며, 성공한 동일 잠금 파일의 설치는 재사용합니다. 의존성 라이프사이클 스크립트 대신 Prisma JavaScript 클라이언트를 명시적으로 생성합니다. TLS 및 패키지 무결성 확인은 유지합니다.
 
-## 실제 운영
+## 기본 실제 파일 운영
+
+START-WINDOWS.bat 또는 START-MAC.command는 node scripts/start-local.mjs를 실행합니다. 별도 `.env.desktop`를 만들고 LOCAL_MODE=true, DEMO_MODE=false를 지정합니다. `.move-local`에 실제 작업·해시된 운영자 암호·암호화된 토큰을 보관합니다. 로그인 정보는 `.move-local/login.txt`에 있습니다. 기본 작업 처리기는 파일 기반 점유와 재시도로 실제 작업·예약을 실행합니다. 뉴스는 시작 시와 2시간마다, 작업 실행 속도는 분당 최대 12건입니다. 뉴스 출처 한 곳이 실패해도 다른 출처는 계속 수집합니다. 실패 내용과 부분 결과는 출처와 작업 기록에 표시합니다.
+
+기본 실행 창을 닫으면 처리기도 종료됩니다. 다음 시작은 저장된 예약과 작업을 읽습니다. 게시 전 계정·승인·최종 미디어를 다시 확인하며 불명확한 외부 쓰기 요청은 자동 반복하지 않습니다. LOCAL_MODE가 명시되지 않은 운영은 PostgreSQL을 사용하며 DB 장애에 따라 파일 모드로 전환하지 않습니다.
+
+## PostgreSQL 실제 운영
 
 START-LIVE-WINDOWS.bat 또는 START-LIVE-MAC.command는 `.env.live`를 만들고 `the-move-live` 프로젝트로 전체 서비스를 실행합니다. 다른 임의 운영자 비밀번호와 데이터베이스 비밀번호를 생성합니다. 기존 파일·데이터·계정 비밀번호는 덮어쓰지 않습니다. 로그인 후 실제 계정은 설정에서 별도로 인증합니다. GPT 플러그인의 인증은 앱에 자동 전달되지 않습니다.
 

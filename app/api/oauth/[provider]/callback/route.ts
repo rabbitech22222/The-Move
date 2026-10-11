@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import { authorize, endpoint, HttpError } from "@/lib/http";
 import { oauthProvider, oauthConfig, verifyOAuthState } from "@/lib/oauth";
 import { saveIntegrationToken } from "@/lib/credentials";
-import { mutateWorkspace } from "@/lib/data";
+import { getWorkspaceData, mutateWorkspace } from "@/lib/data";
+import { connectTheMoveAccount } from "@/lib/integrations/the-move-account";
+import { enqueueTask } from "@/lib/jobs";
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ provider: string }> },
@@ -75,12 +77,27 @@ export async function GET(
         "INVALID_TOKEN_RESPONSE",
         "Provider did not return an access token.",
       );
-    await saveIntegrationToken(
-      provider,
-      token.access_token,
-      token.refresh_token,
-      token.expires_in,
-    );
+    if (provider === "meta") {
+      if ((await getWorkspaceData()).demo)
+        throw new HttpError(
+          409,
+          "DEMO_PUBLISH_DISABLED",
+          "기본 실행 파일로 실제 운영 공간을 열어 주세요. 예시 모드에는 실제 계정을 연결하지 않습니다.",
+        );
+      await connectTheMoveAccount(
+        user.id,
+        undefined,
+        token.access_token,
+        token.expires_in,
+      );
+      await enqueueTask("METRICS_SYNC", { channelId: "the-move" }, user.id);
+    } else
+      await saveIntegrationToken(
+        provider,
+        token.access_token,
+        token.refresh_token,
+        token.expires_in,
+      );
     await mutateWorkspace(
       user.id,
       "integration.authorized",
