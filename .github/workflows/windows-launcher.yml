@@ -27,6 +27,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: windows-local-launcher-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-demo:
     runs-on: windows-latest

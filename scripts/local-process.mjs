@@ -2,6 +2,16 @@ import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
+export function terminateOwnedChild(child, signal = "SIGTERM") {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
+  if (process.platform !== "win32") { child.kill(signal); return; }
+  // Windows does not deliver SIGTERM to Node's handlers. Stop the process tree
+  // created by this launcher, using its exact PID rather than a process name.
+  const killer = spawn(path.join(process.env.SystemRoot || "C:\\Windows", "System32/taskkill.exe"),
+    ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore", shell: false, windowsHide: true });
+  killer.once("error", () => child.kill("SIGKILL"));
+}
+
 export function findNpmCli(nodePath = process.execPath, searchPath = process.env.PATH || "", npmExecPath = process.env.npm_execpath) {
   const directories = [path.dirname(nodePath), ...searchPath.split(path.delimiter).filter(Boolean)];
   const candidates = [npmExecPath];
@@ -50,8 +60,8 @@ export function runCheckedProcess({ command = process.execPath, args, cwd, env =
     const timeout = setTimeout(() => {
       timeoutError = new Error(`${label} 시간 제한을 초과했습니다. 인터넷 연결을 확인한 뒤 다시 실행하세요. 설치 로그: ${logFile || "위 출력"}`);
       record(`${timeoutError.message}\n`);
-      child.kill("SIGTERM");
-      forceKill = setTimeout(() => child.kill("SIGKILL"), 5000);
+      terminateOwnedChild(child);
+      forceKill = setTimeout(() => terminateOwnedChild(child, "SIGKILL"), 5000);
     }, timeoutMs);
     const finish = (error) => {
       if (finished) return;

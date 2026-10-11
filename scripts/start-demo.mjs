@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { findNpmCli, runCheckedProcess } from "./local-process.mjs";
+import { findNpmCli, runCheckedProcess, terminateOwnedChild } from "./local-process.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 process.chdir(root);
@@ -31,11 +31,11 @@ async function setupStep(label, args, timeoutMs = 120000) {
 }
 
 async function stop() {
-  if (setupChild && setupChild.exitCode === null) setupChild.kill("SIGTERM");
+  terminateOwnedChild(setupChild);
   if (!server || server.exitCode !== null) return;
   const stopped = once(server, "exit");
-  server.kill("SIGTERM");
-  const timeout = setTimeout(() => server.kill("SIGKILL"), 5000);
+  terminateOwnedChild(server);
+  const timeout = setTimeout(() => terminateOwnedChild(server, "SIGKILL"), 5000);
   await stopped;
   clearTimeout(timeout);
 }
