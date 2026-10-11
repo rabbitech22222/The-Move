@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: move
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-move_local_only}
+      POSTGRES_DB: the_move
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U move -d the_move"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  app:
+    image: the-move-os:local
+    build: .
+    env_file: .env
+    environment:
+      DEMO_MODE: "false"
+      DATABASE_URL: postgresql://move:${POSTGRES_PASSWORD:-move_local_only}@postgres:5432/the_move?schema=public
+      REDIS_URL: redis://redis:6379
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    command: sh -c 'npm run db:migrate && npm run db:seed && npm run start'
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
+  worker:
+    image: the-move-os:local
+    build: .
+    env_file: .env
+    environment:
+      DEMO_MODE: "false"
+      DATABASE_URL: postgresql://move:${POSTGRES_PASSWORD:-move_local_only}@postgres:5432/the_move?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      app: {condition: service_healthy}
+    command: npm run worker
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,500 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+enum ContentFormat {
+  CAROUSEL
+  REEL
+}
+enum PostFormat {
+  CAROUSEL
+  REEL
+  IMAGE
+  VIDEO
+}
+enum ProjectStage {
+  IDEA
+  RESEARCH
+  DRAFT
+  DESIGN
+  REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+}
+enum DataSource {
+  DEMO
+  META
+}
+enum SourceType {
+  RSS
+  MANUAL
+}
+enum TopicStatus {
+  INBOX
+  SAVED
+  DISMISSED
+}
+enum Confidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+enum TemplateStatus {
+  UNINSPECTED
+  READY
+  SETUP_REQUIRED
+}
+enum DesignStatus {
+  MANUAL_REVIEW
+  QUEUED
+  READY
+  FAILED
+  SETUP_REQUIRED
+}
+enum AssetKind {
+  IMAGE
+  VIDEO
+}
+enum AgentName {
+  Scout
+  Researcher
+  Editor
+  Designer
+  Publisher
+  Analyst
+}
+enum TaskStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+enum ApprovalKind {
+  EDITORIAL
+  PUBLICATION
+  EXPERIMENT
+}
+enum PublicationStatus {
+  SCHEDULED
+  RUNNING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+enum FinanceType {
+  REVENUE
+  EXPENSE
+}
+enum FinanceSource {
+  DEMO
+  MANUAL
+}
+enum RecommendationStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+}
+
+model Workspace {
+  id            String @id @default(cuid())
+  name          String
+  isDemo        Boolean @default(false)
+  createdAt     DateTime @default(now())
+  users         User[]
+  accounts      SocialAccount[]
+  accountMetrics AccountMetric[]
+  posts         Post[]
+  postMetrics   PostMetric[]
+  sources       Source[]
+  topics        Topic[]
+  projects      EditorialProject[]
+  assets        Asset[]
+  templates     CanvaTemplate[]
+  designs       GeneratedDesign[]
+  tasks         AgentTask[]
+  events        AgentEvent[]
+  approvals     Approval[]
+  publications  ScheduledPublication[]
+  finance       FinanceEntry[]
+  audits        AuditLog[]
+  recommendations Recommendation[]
+  editorialRules EditorialRule[]
+  integrationCredentials IntegrationCredential[]
+}
+
+model User {
+  id            String @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  email         String @unique
+  role          Role @default(OPERATOR)
+  passwordHash  String
+  isSystem      Boolean @default(false)
+  createdAt     DateTime @default(now())
+  projects      EditorialProject[]
+  templates     CanvaTemplate[]
+  revisions     ProjectRevision[]
+  approvals     Approval[]
+  auditLogs     AuditLog[]
+  @@index([workspaceId])
+}
+
+model SocialAccount {
+  id                    String @id @default(cuid())
+  workspaceId           String
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                  String
+  handle                String
+  accent                String
+  connected             Boolean @default(false)
+  platformAccountId     String?
+  guidelines            String
+  guidelineVersion      Int @default(1)
+  encryptedAccessToken  String?
+  encryptedRefreshToken String?
+  tokenExpiresAt        DateTime?
+  accountsMetrics       AccountMetric[]
+  posts                 Post[]
+  topics                Topic[]
+  projects              EditorialProject[]
+  templates             CanvaTemplate[]
+  assets                Asset[]
+  finance               FinanceEntry[]
+  editorialRules        EditorialRule[]
+  @@unique([workspaceId, handle])
+  @@index([workspaceId])
+}
+
+model AccountMetric {
+  id            String @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId     String
+  channel       SocialAccount @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  date          DateTime @db.Date
+  followers     Int
+  followerDelta Int?
+  views         Int?
+  reach         Int?
+  engagements   Int?
+  postsPublished Int?
+  source        DataSource
+  syncedAt      DateTime
+  @@unique([channelId, date, source])
+  @@index([workspaceId, date])
+}
+
+model Post {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId   String
+  channel     SocialAccount @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  title       String
+  format      PostFormat
+  category    String
+  publishedAt DateTime
+  permalink   String?
+  source      DataSource
+  metrics     PostMetric[]
+  @@index([workspaceId, publishedAt])
+}
+
+model PostMetric {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  postId      String
+  post        Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  views       Int?
+  reach       Int?
+  likes       Int?
+  comments    Int?
+  saves       Int?
+  shares      Int?
+  source      DataSource
+  syncedAt    DateTime
+  @@unique([postId, date, source])
+  @@index([workspaceId, date])
+}
+
+model Source {
+  id            String @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  url           String
+  type          SourceType
+  enabled       Boolean @default(true)
+  rights        String
+  lastFetchedAt DateTime?
+  lastError     String?
+  topics        Topic[]
+  @@unique([workspaceId, url])
+  @@index([workspaceId])
+}
+
+model Topic {
+  id                   String @id @default(cuid())
+  workspaceId          String
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title                String
+  category             String
+  sourceId             String
+  source               Source @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  sourceUrl            String
+  publishedAt          DateTime?
+  retrievedAt          DateTime
+  relevance            Int
+  confidence           Confidence
+  scoreExplanation     String
+  recommendedChannelId String
+  recommendedChannel   SocialAccount @relation(fields: [recommendedChannelId], references: [id], onDelete: Restrict)
+  format               ContentFormat
+  status               TopicStatus @default(INBOX)
+  uncertainClaims      String[]
+  rights               String
+  @@unique([workspaceId, sourceUrl])
+  @@index([workspaceId, status, retrievedAt])
+}
+
+model EditorialProject {
+  id                String @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title             String
+  channelId         String
+  channel           SocialAccount @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  operatorId        String
+  operator          User @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  stage             ProjectStage @default(IDEA)
+  format            ContentFormat
+  draftCopy         String @default("")
+  dueAt             DateTime?
+  productionMinutes Int @default(0)
+  updatedAt         DateTime
+  references        ProjectSourceReference[]
+  revisions         ProjectRevision[]
+  assets            Asset[]
+  designs           GeneratedDesign[]
+  approvals         Approval[]
+  publications      ScheduledPublication[]
+  @@index([workspaceId, stage])
+}
+
+model ProjectSourceReference {
+  id        String @id @default(cuid())
+  projectId String
+  project   EditorialProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int
+  @@unique([projectId, position])
+}
+
+model ProjectRevision {
+  id        String @id @default(cuid())
+  projectId String
+  project   EditorialProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  at        DateTime
+  note      String
+  @@index([projectId, at])
+}
+
+model Asset {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId   String?
+  channel     SocialAccount? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  projectId   String
+  project     EditorialProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  url         String
+  mimeType    String
+  kind        AssetKind
+  approved    Boolean @default(false)
+  width       Int?
+  height      Int?
+  rights      String
+  credit      String?
+  createdAt   DateTime @default(now())
+  @@index([workspaceId, projectId])
+}
+
+model EditorialRule {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId   String
+  channel     SocialAccount @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  version     Int
+  content     String
+  createdAt   DateTime @default(now())
+  @@unique([channelId, version])
+}
+
+model CanvaTemplate {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  channelId   String
+  channel     SocialAccount @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  format      ContentFormat
+  operatorId  String?
+  operator    User? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  designId    String
+  width       Int
+  height      Int
+  inspectedAt DateTime?
+  fields      String[]
+  status      TemplateStatus @default(UNINSPECTED)
+  approved    Boolean @default(false)
+  designs     GeneratedDesign[]
+  @@unique([workspaceId, designId])
+  @@index([workspaceId])
+}
+
+model GeneratedDesign {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     EditorialProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    CanvaTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  status      DesignStatus
+  editUrl     String?
+  externalId  String?
+  error       String?
+  createdAt   DateTime @default(now())
+  @@index([workspaceId, projectId])
+}
+
+model AgentTask {
+  id             String @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent          AgentName
+  kind           String
+  status         TaskStatus @default(QUEUED)
+  progress       Int @default(0)
+  message        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  result         String?
+  isDemo         Boolean @default(false)
+  idempotencyKey String? @unique
+  events         AgentEvent[]
+  @@index([workspaceId, status, createdAt])
+}
+
+model AgentEvent {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  taskId      String
+  task        AgentTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  at          DateTime @default(now())
+  status      TaskStatus
+  message     String
+  @@index([workspaceId, at])
+}
+
+model Approval {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     EditorialProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  kind        ApprovalKind
+  approvedAt  DateTime
+  revisionAt  DateTime
+  payloadHash String?
+  @@index([workspaceId, projectId, kind])
+}
+
+model ScheduledPublication {
+  id             String @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        EditorialProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scheduledAt    DateTime
+  status         PublicationStatus @default(SCHEDULED)
+  platformPostId String?
+  error          String?
+  mediaUrl       String
+  caption        String
+  @@index([workspaceId, status, scheduledAt])
+}
+
+model FinanceEntry {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  channelId   String
+  channel     SocialAccount @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  type        FinanceType
+  amount      Decimal @db.Decimal(14, 2)
+  currency    String @default("KRW")
+  date        DateTime @db.Date
+  description String
+  source      FinanceSource
+  @@index([workspaceId, date])
+}
+
+model AuditLog {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  action      String
+  entityId    String
+  at          DateTime @default(now())
+  details     String
+  @@index([workspaceId, at])
+}
+
+model Recommendation {
+  id               String @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title            String
+  rationale        String
+  status           RecommendationStatus @default(PROPOSED)
+  createdAt        DateTime @default(now())
+  experimentResult String?
+  @@index([workspaceId, status])
+}
+
+model IntegrationCredential {
+  id                    String @id @default(cuid())
+  workspaceId           String @default("the-move")
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider              String
+  encryptedToken        String
+  encryptedRefreshToken String?
+  expiresAt             DateTime?
+  updatedAt             DateTime @updatedAt
+  @@unique([workspaceId, provider])
+}
