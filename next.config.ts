@@ -4,6 +4,7 @@ const config: NextConfig = {
   outputFileTracingExcludes: {
     "/*": [
       "./.move-data/**/*",
+      "./.move-local/**/*",
       "./.move-runtime/**/*",
       "./.env*",
       "./tests/**/*",

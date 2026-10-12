@@ -17,6 +17,8 @@ import {
 } from "./services/canva";
 import { syncInstagramMetrics } from "./integrations/meta";
 import { publishScheduledPublication } from "./services/publishing";
+import { refreshCanvaDesign } from "./services/canva";
+import { uploadCanvaAsset } from "./services/canva-assets";
 import { ServiceError, errorMessage } from "./services/errors";
 
 export const jobKinds = [
@@ -28,10 +30,13 @@ export const jobKinds = [
   "AI_RECOMMENDATIONS",
   "WEEKLY_REPORT",
   "CANVA_GENERATE",
+  "CANVA_RESULT",
   "PUBLICATION",
 ] as const;
 export type JobKind = (typeof jobKinds)[number];
 export interface TaskPayload {
+  designId?: string;
+  assetId?: string;
   sourceId?: string;
   channelId?: string;
   projectId?: string;
@@ -56,6 +61,7 @@ const agents: Record<JobKind, AgentName> = {
   AI_RECOMMENDATIONS: "Scout",
   WEEKLY_REPORT: "Analyst",
   CANVA_GENERATE: "Designer",
+  CANVA_RESULT: "Designer",
   PUBLICATION: "Publisher",
 };
 let queue: Queue | undefined;
@@ -126,6 +132,14 @@ function assertPayload(kind: JobKind, payload: TaskPayload): void {
   for (const key of required[kind] ?? [])
     if (!payload[key])
       throw new ServiceError("INVALID_JOB", `${kind} requires ${key}.`);
+  if (
+    kind === "CANVA_RESULT" &&
+    Number(!!payload.designId) + Number(!!payload.assetId) !== 1
+  )
+    throw new ServiceError(
+      "INVALID_JOB",
+      "확인할 Canva 디자인 또는 미디어 한 개를 선택하세요.",
+    );
   for (const [key, value] of Object.entries(payload)) {
     if (key === "canvaOptions") {
       if (
@@ -271,12 +285,11 @@ export async function enqueueTask(
         { taskId: task.id, kind, payload, actorId } satisfies QueuePayload,
         {
           jobId: task.id,
-          attempts: kind === "PUBLICATION" ? 120 : 4,
+          attempts: ["PUBLICATION", "CANVA_RESULT"].includes(kind) ? 120 : 4,
           delay,
-          backoff:
-            kind === "PUBLICATION"
-              ? { type: "fixed", delay: 5000 }
-              : { type: "exponential", delay: 2000 },
+          backoff: ["PUBLICATION", "CANVA_RESULT"].includes(kind)
+            ? { type: "fixed", delay: 5000 }
+            : { type: "exponential", delay: 2000 },
           removeOnComplete: { count: 1000 },
           removeOnFail: { count: 1000 },
         },
@@ -400,7 +413,54 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
           actorId,
           payload.canvaOptions,
         );
+        if (
+          (result as { status: string; id: string; externalId?: string })
+            .status === "QUEUED" &&
+          (result as { externalId?: string }).externalId?.startsWith("job:")
+        )
+          await enqueueTask(
+            "CANVA_RESULT",
+            {
+              designId: (result as { id: string }).id,
+              idempotencyKey: `canva-design-${(result as { id: string }).id}`,
+            },
+            actorId,
+          );
         break;
+      case "CANVA_RESULT": {
+        if (payload.designId) {
+          const design = await refreshCanvaDesign(payload.designId, actorId);
+          if (design.status === "QUEUED")
+            throw new ServiceError(
+              "CANVA_PROCESSING",
+              "Canva가 실제 디자인을 제작 중입니다. 같은 작업의 결과를 확인하고 있습니다.",
+              409,
+            );
+          if (design.status !== "READY")
+            throw new ServiceError(
+              "CANVA_GENERATION_FAILED",
+              design.error || "Canva가 디자인 제작에 실패했습니다.",
+              409,
+            );
+          result = design;
+        } else {
+          const asset = await uploadCanvaAsset(payload.assetId!, actorId, true);
+          if (asset.canvaUploadError)
+            throw new ServiceError(
+              "CANVA_UPLOAD_FAILED",
+              asset.canvaUploadError,
+              409,
+            );
+          if (!asset.canvaAssetId)
+            throw new ServiceError(
+              "CANVA_PROCESSING",
+              "Canva가 승인 미디어를 가져오는 중입니다. 같은 업로드의 결과를 확인하고 있습니다.",
+              409,
+            );
+          result = asset;
+        }
+        break;
+      }
       case "PUBLICATION":
         result = await publishScheduledPublication(
           payload.publicationId!,
@@ -413,13 +473,17 @@ export async function processTask(input: QueuePayload): Promise<unknown> {
       actorId,
       "SUCCEEDED",
       100,
-      "작업을 완료했습니다. 기록된 결과를 확인하세요.",
+      kind === "CANVA_GENERATE" &&
+        (result as { status?: string })?.status === "QUEUED"
+        ? "Canva에 제작 요청을 제출했습니다. 제작은 진행 중이며 결과 확인 작업에서 실제 완료를 확인합니다."
+        : "작업을 완료했습니다. 기록된 결과를 확인하세요.",
       result,
     );
     return result;
   } catch (error) {
     const processing =
-      error instanceof ServiceError && error.code === "CONTAINER_PROCESSING";
+      error instanceof ServiceError &&
+      ["CONTAINER_PROCESSING", "CANVA_PROCESSING"].includes(error.code);
     await taskProgress(
       task.id,
       actorId,

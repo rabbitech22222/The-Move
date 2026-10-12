@@ -67,8 +67,12 @@ export function verifyOAuthState(
     throw new Error("OAuth state expired or does not match this session.");
   return value as { verifier: string };
 }
-export function authorizationUrl(provider: OAuthProvider, userId: string) {
-  const config = oauthConfig(provider),
+export function authorizationUrl(
+  provider: OAuthProvider,
+  userId: string,
+  suppliedConfig?: ReturnType<typeof oauthConfig>,
+) {
+  const config = suppliedConfig || oauthConfig(provider),
     state = createOAuthState(userId);
   const url = new URL(
     provider === "canva"

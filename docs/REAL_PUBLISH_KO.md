@@ -6,7 +6,11 @@
 
 GPT에 연결한 플러그인 토큰은 다운로드한 앱에 전달되지 않습니다. 이 코딩 대화에서도 Canva·Instagram 도구가 제공되지 않아 해당 인증을 재사용하지 못했습니다. 외부 토큰을 추출하거나 채팅으로 보내지 마세요.
 
-Canva Connect 개발자 앱의 `CANVA_CLIENT_ID`, `CANVA_CLIENT_SECRET`과 Meta 앱의 `META_APP_ID`, `META_APP_SECRET`을 내 컴퓨터의 실제 실행 환경 파일 (`.env.desktop` 또는 `.env.live`)에 설정합니다. 접근 토큰을 사용하는 관리자는 `CANVA_ACCESS_TOKEN`, `META_ACCESS_TOKEN`을 서버 환경에만 저장할 수 있습니다. 외부 앱 설정에는 다음 콜백 주소를 정확히 등록합니다. 실제 사용하는 APP_URL과 포트가 다르면 함께 바꿔야 합니다.
+앱 설정의 **계정 로그인 준비**에서 Meta·Canva 공식 개발자 앱의 클라이언트 ID와 비밀 키를 입력합니다. 서버가 암호화해 저장하며 다시 화면에 반환하지 않습니다. 공식 개발자 콘솔에 앱이 표시하는 콜백 주소를 등록한 뒤 **계정 인증**을 누릅니다. 앱 설정 저장 자체는 인증 성공이 아닙니다. 로그인은 공식 Meta·Canva 화면에서 진행하며 Canva는 PKCE, 두 제공자는 세션에 묶인 만료 state를 사용합니다. 저장한 앱 정보는 파일 수정이나 서버 재시작 없이 인증·토큰 갱신에 사용합니다. 환경 변수 설정이 있으면 그 값을 우선합니다.
+
+공식 접근 토큰을 가진 관리자는 **Meta 액세스 토큰 → THE MOVE 인증·지표 수집**, **Canva 액세스 토큰 → Canva 인증·원본 검사**를 사용할 수 있습니다. Meta는 @themovemag\_ 이름과 ID, Canva는 지정된 실제 원본 접근을 확인한 후에만 저장합니다. 다른 계정 또는 접근 불가능한 원본은 성공으로 표시하지 않습니다. 일부 원본이나 필드 접근에 실패하면 해당 원본의 설정 필요 상태와 오류를 표시합니다.
+
+기본 콜백 주소:
 
 - Canva: `http://localhost:3000/api/oauth/canva/callback`
 - Meta: `http://localhost:3000/api/oauth/meta/callback`
@@ -48,6 +52,16 @@ docker compose --project-name the-move-live --env-file .env.live down
 
 릴스도 실제 원본 `DAHPcvVkH8k`의 필드를 검사합니다. 영상 자료 필드가 있으면 인증된 Canva 영상 자료 ID로 새 디자인을 자동 생성합니다. 원본의 가로 영상 프레임 위치와 비율은 변경 요청하지 않습니다. 필드가 없으면 원본을 수정하지 않고 사본에 필드를 설정해 브랜드 템플릿으로 연결하거나, Canva에서 **사본 만들기**로 제목·영상·출처를 교체하고 새 편집 링크를 수동 검토로 등록합니다. 수동 사본을 API 생성으로 표시하지 않습니다. 실제 원본 필드와 프레임 적합성은 인증 후 확인해야 합니다.
 
+## 실제 미디어 업로드 및 제작
+
+스튜디오나 캔바 제작소에서 해당 프로젝트의 공개 HTTPS 이미지·영상 주소와 출처·이용 권한을 기록합니다. 운영자가 미디어를 승인한 뒤 **승인 자료를 Canva로 업로드**를 누릅니다. 서버가 공개 주소·파일 응답·유형을 확인한 다음 공식 `POST /v1/asset-uploads` 바이너리 API로 전송합니다. 사용자 라이브러리에 실제 업로드된 자료 ID가 확인돼야 업로드 완료로 기록합니다. 서버의 파일당 제한은 32MiB입니다. 큰 영상은 Canva에 직접 업로드한 후 정당한 자료 ID를 입력하는 경로를 사용합니다. 이 제한은 Canva 플랫폼의 전체 업로드 한도가 아닙니다.
+
+확인된 자동 채우기 이미지·영상 필드에서 **업로드 완료한 승인 자료**를 선택합니다. 제목·본문·출처는 실제 데이터셋 필드명을 사용합니다. 초안과 출처를 확인하고 프로젝트를 디자인 단계로 옮긴 뒤 **Canva에서 생성**을 누릅니다. 스튜디오→제작소 이동 시 선택한 프로젝트와 담당자 원본을 유지합니다.
+
+업로드·제작은 비동기입니다. 실제 작업 ID가 있으면 작업 처리기가 결과를 계속 확인합니다. 처리 중에는 제작 완료로 표시하지 않습니다. 실제 새 디자인 ID와 동일한 디자인의 편집 링크를 받아야 완료되며 스튜디오 검토 단계로 이동합니다. 불명확한 제출은 자동 재전송하지 않습니다. 조회 한도를 초과하면 기존 요청의 수동 결과 확인을 안내합니다. 생성은 Instagram 게시를 실행하지 않습니다.
+
+기존 디자인에서 직접 생성하는 `create_from_design`과 원본 데이터셋 조회는 현재 공식 명세상 미리보기 기능입니다. 운영용 경로는 원본을 보존한 승인된 사본을 브랜드 템플릿으로 연결하는 `create_from_brand_template`입니다. 계정 자격·앱 권한·실제 필드가 없으면 임의 디자인으로 바꾸지 않습니다. 공식 명세: [Canva 공식 SDK OpenAPI](https://github.com/canva-sdks/canva-connect-api-starter-kit/blob/main/openapi/spec.yml).
+
 ## 파일 내보내기 → 사람 승인 → Instagram 게시
 
 1. 출처와 초안이 있는 디자인·검토 단계 프로젝트에서 새 디자인을 생성하거나 사본을 등록합니다.
@@ -65,3 +79,14 @@ Canva 다운로드 주소는 만료될 수 있습니다. 늦은 예약에는 운
 로컬 앱·한국어 화면·권한 검증과 API 응답을 대체한 계약 테스트는 별도로 기록합니다. 현재 실제 Canva 및 Meta 계정 인증이 제공되지 않아 원본 디자인 확인, 실제 생성·내보내기와 실제 @themovemag\_ 게시의 외부 서비스 종단 검증은 미완료입니다. 계정 연결을 했다는 사실만으로 생성·게시 성공을 주장하지 않습니다.
 
 공식 참고: [Canva 내보내기 API](https://www.canva.dev/docs/connect/api-reference/exports/create-design-export-job/), [Canva Autofill](https://www.canva.dev/docs/connect/api-reference/autofills/), [Meta Instagram 게시](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/content-publishing/).
+
+## 인증된 제공자 종단 검증
+
+인증을 실제 운영 앱 또는 클라우드 보안 설정에 제공한 뒤 실행합니다. 응답을 대체하지 않고 실제 Meta 계정·지표와 Canva 원본을 조회합니다. 생성 검증은 기존 디자인 단계 프로젝트와 실제 데이터셋 입력 파일을 지정해야 합니다.
+
+```sh
+node --import tsx scripts/check-provider-production.ts
+node --import tsx scripts/check-provider-production.ts --generate --project 실제_프로젝트_ID --template 승인된_템플릿_ID --fields 내_컴퓨터의_입력.json
+```
+
+입력 파일 형식은 `fields`, `assetBindings`, 선택적 `pageCount`입니다. `fields`는 실제 이름에 대응한 `{type:"text",text:"..."}` 또는 인증된 자료 ID입니다. `assetBindings`는 실제 필드 이름에 해당 프로젝트의 승인된 미디어 참조 ID를 대응합니다. 도구는 새 디자인을 생성하고 결과를 확인하지만 Instagram 게시는 하지 않습니다. 인증이 없으면 `BLOCKED`, 종료 코드 2로 중단하며 연결·제작 성공을 가장하지 않습니다.

@@ -17,7 +17,7 @@ setup:local은 기존 `.env`를 보존하고 새 파일에 임의 세션·암호
 
 Windows 기본 실행기는 npm-cli.js를 Node로 직접 실행해 shell=true 경고를 피합니다. 패키지 설치는 진행 로그와 10초마다 경과 시간을 표시합니다. 설치 중단 시 완료 기록을 남기지 않아 재시도하며, 성공한 동일 잠금 파일의 설치는 재사용합니다. 의존성 라이프사이클 스크립트 대신 Prisma JavaScript 클라이언트를 명시적으로 생성합니다. TLS 및 패키지 무결성 확인은 유지합니다.
 
-## 기본 실제 파일 운영
+## 기본 운영 빌드의 실제 파일 운영
 
 START-WINDOWS.bat 또는 START-MAC.command는 node scripts/start-local.mjs를 실행합니다. 별도 `.env.desktop`를 만들고 LOCAL_MODE=true, DEMO_MODE=false를 지정합니다. `.move-local`에 실제 작업·해시된 운영자 암호·암호화된 토큰을 보관합니다. 로그인 정보는 `.move-local/login.txt`에 있습니다. 기본 작업 처리기는 파일 기반 점유와 재시도로 실제 작업·예약을 실행합니다. 뉴스는 시작 시와 2시간마다, 작업 실행 속도는 분당 최대 12건입니다. 뉴스 출처 한 곳이 실패해도 다른 출처는 계속 수집합니다. 실패 내용과 부분 결과는 출처와 작업 기록에 표시합니다.
 
@@ -64,3 +64,5 @@ CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
 클라우드 설치는 bash scripts/cloud-install.sh를 사용합니다. 환경 저장 후 새 작업에서는 앱·처리기를 다시 실행해야 합니다. 로그를 `.move-runtime`에 남기고 기존 정상 실행 상태를 먼저 확인해 중복 프로세스를 만들지 않습니다. 이 클라우드의 localhost는 사용자 컴퓨터의 주소가 아니며 미리보기 링크를 제공하지 않습니다.
 
 클라우드 Docker 빌드는 npm run docker:build:cloud로 기존 프록시 경로와 제공된 CA를 BuildKit 임시 비밀로 전달합니다. CA를 이미지에 복사하거나 TLS 검증을 끄지 않습니다. 사용자 컴퓨터에서는 일반 docker compose build를 사용합니다. 컨테이너의 외부 API 요청도 배포 환경의 지원되는 프록시·CA 설정이 별도로 필요할 수 있습니다.
+
+계정 설정에서 OAuth 앱 정보를 암호화해 저장한 변경은 재시작 없이 적용합니다. 기본 실행은 최적화 빌드를 실행하며 앱 소스 변경 시에만 재빌드합니다. 개발 작업에는 npm run dev를 별도로 사용합니다. 코드·마이그레이션을 업그레이드할 때는 이전 실행 창을 종료한 뒤 새 버전을 실행합니다.

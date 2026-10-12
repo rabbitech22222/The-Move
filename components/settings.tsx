@@ -20,12 +20,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Operator } from "@/lib/domain";
+import { OAuthAppSetup } from "./oauth-app-setup";
 
 type Integration = {
   configured: boolean;
   status: string;
   details: string;
   oauthReady?: boolean;
+  callbackUrl?: string;
 };
 type SettingsData = {
   instagram?: {
@@ -88,6 +90,7 @@ export function Settings() {
   const [accountChannelId, setAccountChannelId] = useState("the-move");
   const [accountId, setAccountId] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [canvaToken, setCanvaToken] = useState("");
   const [accountBusy, setAccountBusy] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{
@@ -218,6 +221,101 @@ export function Settings() {
           {notice.text}
         </div>
       )}
+      <section id="oauth-apps" className="panel p-5 space-y-4">
+        <h2 className="font-semibold">계정 로그인 준비</h2>
+        <p className="text-sm muted">
+          공식 OAuth 앱을 설정하면 파일 수정·서버 재시작 없이 아래 계정 인증
+          버튼으로 로그인할 수 있습니다. 비밀 키는 서버에서 암호화하며 응답에
+          포함하지 않습니다.
+        </p>
+        <OAuthAppSetup
+          provider="meta"
+          callbackUrl={
+            configuration?.integrations.meta.callbackUrl ||
+            "/api/oauth/meta/callback"
+          }
+          disabled={!!data.demo || !configuration?.canManageIntegrations}
+          onSaved={() => void loadConfiguration()}
+        />
+        <OAuthAppSetup
+          provider="canva"
+          callbackUrl={
+            configuration?.integrations.canva.callbackUrl ||
+            "/api/oauth/canva/callback"
+          }
+          disabled={!!data.demo || !configuration?.canManageIntegrations}
+          onSaved={() => void loadConfiguration()}
+        />
+      </section>
+      <section id="canva-connection" className="panel p-5 space-y-4">
+        <h2 className="font-semibold">Canva 실제 계정 연결·원본 검사</h2>
+        <p className="text-sm muted">
+          Canva OAuth로 로그인하거나 정당한 권한의 공식 토큰을 연결합니다.
+          지정한 원본 접근을 실제 API로 확인한 뒤 저장하며, 원본마다 자동 채우기
+          필드를 검사합니다. 원본에 필드가 없다면 사본 브랜드 템플릿 설정이
+          필요합니다.
+        </p>
+        <Button
+          variant="outline"
+          disabled={
+            !!accountBusy ||
+            !configuration?.integrations.canva.configured ||
+            !configuration?.canManageIntegrations
+          }
+          onClick={() =>
+            void accountAction(
+              "/api/settings",
+              { action: "connect-canva" },
+              "canva-check",
+              "Canva 연결 검사를 마쳤습니다. 제작소에서 각 원본의 실제 검사 결과와 설정 필요 항목을 확인하세요.",
+            )
+          }
+        >
+          저장된 Canva 인증으로 원본 검사
+        </Button>
+        <form
+          className="space-y-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              await accountAction(
+                "/api/settings",
+                { action: "connect-canva", accessToken: canvaToken.trim() },
+                "canva-token",
+                "Canva 원본 접근을 확인했습니다. 필드 검사 결과는 캔바 제작소에서 확인하세요.",
+              );
+            } finally {
+              setCanvaToken("");
+            }
+          }}
+        >
+          <label className="block">
+            <span className="field-label">
+              Canva 액세스 토큰 · 서버 암호화 저장
+            </span>
+            <input
+              type="password"
+              autoComplete="off"
+              className="input w-full mt-1"
+              value={canvaToken}
+              onChange={(e) => setCanvaToken(e.target.value)}
+            />
+          </label>
+          <Button
+            disabled={
+              !!data.demo ||
+              !!accountBusy ||
+              canvaToken.trim().length < 20 ||
+              !configuration?.canManageIntegrations
+            }
+          >
+            Canva 인증·원본 검사
+          </Button>
+        </form>
+        <a href="/canva" className="text-sm underline">
+          원본 검사 결과와 실제 제작으로 이동
+        </a>
+      </section>
       <section className="panel">
         <div className="panel-header flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -331,7 +429,9 @@ export function Settings() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <h2 className="font-semibold">Instagram 계정 연결</h2>
+            <h2 id="instagram-connection" className="font-semibold">
+              Instagram 계정 연결
+            </h2>
             <p className="mt-2 text-sm">
               연결 및 게시 대상: <strong>@themovemag_</strong>
             </p>

@@ -33,6 +33,20 @@ export function ProjectAssets({
   const [credit, setCredit] = useState("");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
+  async function transfer(assetId: string, refresh = false) {
+    setBusy(true);
+    setError(null);
+    try {
+      await mutate("/api/canva", {
+        action: refresh ? "refresh-asset" : "upload-asset",
+        assetId,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Canva 업로드 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
   const locked = project.stage === "SCHEDULED" || project.stage === "PUBLISHED";
   const unavailable = locked || disabled || busy;
   const assets =
@@ -172,6 +186,39 @@ export function ProjectAssets({
                 </div>
               </div>
               <div className="flex flex-wrap justify-end items-center gap-2 mt-3">
+                {asset.canvaAssetId && (
+                  <p className="text-xs positive mr-auto">
+                    Canva 업로드 완료 · {asset.canvaAssetId}
+                  </p>
+                )}
+                {asset.canvaUploadError && (
+                  <p className="text-xs text-red-600 w-full" role="alert">
+                    {asset.canvaUploadError}
+                  </p>
+                )}
+                {asset.canvaUploadJobId && !asset.canvaAssetId && (
+                  <p className="text-xs muted w-full">
+                    {asset.canvaUploadJobId === "pending"
+                      ? "응답 대조 필요 · 중복 업로드 차단"
+                      : "실제 Canva 업로드 처리 중"}
+                  </p>
+                )}
+                {asset.approved && !asset.canvaAssetId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      unavailable || asset.canvaUploadJobId === "pending"
+                    }
+                    onClick={() =>
+                      void transfer(asset.id, !!asset.canvaUploadJobId)
+                    }
+                  >
+                    {asset.canvaUploadJobId
+                      ? "Canva 업로드 결과 확인"
+                      : "승인 자료를 Canva로 업로드"}
+                  </Button>
+                )}
                 {asset.approved ? (
                   <span className="text-[10px] positive flex items-center gap-1.5 mr-auto">
                     <CheckCircle2 size={12} />

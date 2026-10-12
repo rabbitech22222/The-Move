@@ -1,5 +1,10 @@
 import { getWorkspaceData, mutateWorkspace } from "./data";
-import { enqueueTask, processTask, type QueuePayload } from "./jobs";
+import {
+  enqueueTask,
+  processTask,
+  taskProgress,
+  type QueuePayload,
+} from "./jobs";
 import { ServiceError } from "./services/errors";
 import { defaultNewsSources } from "./news-sources";
 import { mkdir, writeFile, rename, readFile } from "node:fs/promises";
@@ -78,7 +83,7 @@ export async function runLocalJobOnce(): Promise<boolean> {
     const task = draft.tasks.find((t) => t.id === ready.id)!;
     const job = task.localJob!;
     const retry =
-      errorCode === "CONTAINER_PROCESSING" ||
+      ["CONTAINER_PROCESSING", "CANVA_PROCESSING"].includes(errorCode || "") ||
       [
         "RATE_LIMITED",
         "API_UNAVAILABLE",
@@ -87,12 +92,13 @@ export async function runLocalJobOnce(): Promise<boolean> {
       ].includes(errorCode || "");
     if (
       retry &&
-      job.attempts < (task.kind === "PUBLICATION" ? 120 : 4) &&
+      job.attempts <
+        (["PUBLICATION", "CANVA_RESULT"].includes(task.kind) ? 120 : 4) &&
       (task.kind !== "PUBLICATION" || errorCode === "CONTAINER_PROCESSING")
     ) {
       job.dueAt =
         Date.now() +
-        (errorCode === "CONTAINER_PROCESSING"
+        (["CONTAINER_PROCESSING", "CANVA_PROCESSING"].includes(errorCode || "")
           ? 5000
           : Math.min(60000, 2000 * 2 ** job.attempts));
       delete job.leasePid;
@@ -100,6 +106,21 @@ export async function runLocalJobOnce(): Promise<boolean> {
       task.status = "QUEUED";
     } else delete task.localJob;
   });
+  const current = (await getWorkspaceData()).tasks.find(
+    (t) => t.id === ready.id,
+  )!;
+  if (
+    errorCode === "CANVA_PROCESSING" &&
+    !current.localJob &&
+    current.status === "QUEUED"
+  )
+    await taskProgress(
+      current.id,
+      "system",
+      "FAILED",
+      50,
+      "Canva 결과 확인의 제한 횟수를 초과했습니다. 새 디자인을 재요청하지 말고 기존 작업 결과를 제작소에서 확인하세요.",
+    );
   return true;
 }
 export async function prepareNewsQueue() {

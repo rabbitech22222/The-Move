@@ -317,6 +317,9 @@ model ProjectRevision {
 }
 
 model Asset {
+  canvaUploadJobId String?
+  canvaAssetId String?
+  canvaUploadError String?
   id          String @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

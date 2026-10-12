@@ -15,9 +15,9 @@ Node.js 24 이상이 필요합니다. ZIP 압축을 풀고 다음 파일을 실�
 | 실제 뉴스·편집·계정 연동 (Docker 불필요) | START-WINDOWS.bat      | START-MAC.command      |
 | PostgreSQL + Redis 운영 (Docker 필요)    | START-LIVE-WINDOWS.bat | START-LIVE-MAC.command |
 
-기본 실행기는 **실제 로컬 운영**을 시작합니다. 보안 설정 `.env.desktop`, 실제 작업 `.move-local`, 초기 로그인 정보 `.move-local/login.txt`를 준비합니다. 기사·지표를 만들어 넣지 않습니다. 공개 RSS 3곳을 실제 수집하고 화면의 제작 후보에서 출처가 있는 조사 준비서를 스튜디오에 저장할 수 있습니다. Instagram 인증과 OpenAI 키는 이 과정의 필수 조건이 아닙니다.
+기본 실행기는 **운영 빌드의 실제 로컬 운영**을 시작합니다. 첫 실행 또는 앱 소스 변경 시 최적화 빌드하며, 검증된 빌드는 다음 실행에서 재사용합니다. 보안 설정 `.env.desktop`, 실제 작업 `.move-local`, 초기 로그인 정보 `.move-local/login.txt`를 준비합니다. 기사·지표를 만들어 넣지 않습니다. 공개 RSS 3곳을 실제 수집하고 화면의 제작 후보에서 출처가 있는 조사 준비서를 스튜디오에 저장할 수 있습니다. Instagram 인증과 OpenAI 키는 이 과정의 필수 조건이 아닙니다.
 
-설정에서 Meta 인증 또는 정당한 권한으로 발급한 토큰을 연결하면 @themovemag\_ 이름·ID를 API로 검증한 뒤 실제 지표 수집을 요청합니다. 인증 없이 연결됨으로 표시하지 않습니다. 작업 처리기는 파일 잠금·작업 점유·재시도·실제 상태 기록을 사용하며 기본 실행 창이 열려 있어야 동작합니다. 예약과 불명확한 게시 응답은 기존 승인·중복 방지 조건을 유지합니다.
+설정에서 Meta·Canva OAuth 앱 정보를 암호화해 저장하고 공식 로그인 또는 정당한 권한의 토큰을 연결합니다. Canva는 원본 접근·실제 필드를 검사하고, 승인된 프로젝트 자료를 정식 바이너리 API로 업로드해 제작 필드에서 선택할 수 있습니다. 비동기 결과는 처리기가 실제 완료를 확인한 뒤 기록합니다. Meta 인증 또는 정당한 권한으로 발급한 토큰을 연결하면 @themovemag\_ 이름·ID를 API로 검증한 뒤 실제 지표 수집을 요청합니다. 인증 없이 연결됨으로 표시하지 않습니다. 작업 처리기는 파일 잠금·작업 점유·재시도·실제 상태 기록을 사용하며 기본 실행 창이 열려 있어야 동작합니다. 예약과 불명확한 게시 응답은 기존 승인·중복 방지 조건을 유지합니다.
 
 고급 운영 실행기는 `.env.live`와 Docker 프로젝트를 사용합니다. 로컬 파일 모드와 데이터베이스 모드는 별도 저장소이며 자동으로 전환·병합하지 않습니다.
 
@@ -60,6 +60,7 @@ Canva 결과물을 페이지별 PNG 또는 릴스 MP4로 내보내고 스튜디�
 
 ```sh
 node scripts/check-real-workflow.mjs # 실제 기본 실행 앱을 켠 상태에서 RSS → 후보 → 편집 검증
+node --import tsx scripts/check-provider-production.ts # 실제 인증된 제공자 조회; 없는 경우 BLOCKED
 npm run typecheck
 npm test
 npm run build

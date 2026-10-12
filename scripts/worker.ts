@@ -6,6 +6,7 @@ import {
   closeQueue,
   processTask,
   redisConnection,
+  taskProgress,
   registerRecurringJobs,
   type QueuePayload,
 } from "../lib/jobs";
@@ -25,6 +26,18 @@ async function main() {
       } catch (error) {
         const code =
           error instanceof ServiceError ? error.code : "OPERATION_FAILED";
+        if (
+          code === "CANVA_PROCESSING" &&
+          data.taskId &&
+          job.attemptsMade + 1 >= (job.opts.attempts || 1)
+        )
+          await taskProgress(
+            data.taskId,
+            data.actorId,
+            "FAILED",
+            50,
+            "Canva 결과 확인의 제한 횟수를 초과했습니다. 새 디자인을 재요청하지 말고 기존 작업 결과를 제작소에서 확인하세요.",
+          );
         if (
           [
             "API_OUTCOME_UNKNOWN",

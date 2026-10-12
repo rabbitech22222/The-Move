@@ -1,4 +1,5 @@
 import { prepareDesktop } from "./prepare-desktop.mjs";
+import { applicationHash } from "./application-hash.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -35,7 +36,7 @@ const runtime = path.join(root, ".move-runtime");
 const logFile = path.join(runtime, "setup.log");
 const installMarker = path.join(runtime, "dependencies.sha256");
 
-async function setupStep(label, args, timeoutMs = 120000) {
+async function setupStep(label, args, timeoutMs = 120000, extraEnv = {}) {
   await runCheckedProcess({
     args,
     cwd: root,
@@ -44,6 +45,7 @@ async function setupStep(label, args, timeoutMs = 120000) {
     timeoutMs,
     env: {
       ...process.env,
+      ...extraEnv,
       npm_config_cache:
         process.env.npm_config_cache || path.join(runtime, "npm-cache"),
     },
@@ -127,7 +129,7 @@ async function main() {
     // Skipping lifecycle scripts avoids downloading unused native Prisma engines.
     // npm still verifies package-lock integrity and HTTPS certificates.
     await setupStep(
-      "[1/3] 패키지 설치",
+      "[1/4] 패키지 설치",
       [
         npmCli,
         "ci",
@@ -144,14 +146,14 @@ async function main() {
     );
     writeFileSync(installMarker, lockHash, { mode: 0o600 });
   } else {
-    console.log("[1/3] 검증된 패키지 설치를 재사용합니다.");
+    console.log("[1/4] 검증된 패키지 설치를 재사용합니다.");
   }
-  await setupStep("[2/3] 로컬 설정 준비", [
+  await setupStep("[2/4] 로컬 설정 준비", [
     path.join(root, "scripts/setup-local.mjs"),
   ]);
   const { config } = await import("dotenv");
   config({ path: path.join(root, ".env"), quiet: true });
-  await setupStep("[3/3] 데이터 클라이언트 생성", [
+  await setupStep("[3/4] 데이터 클라이언트 생성", [
     path.join(root, "node_modules/prisma/build/index.js"),
     "generate",
   ]);
@@ -167,7 +169,7 @@ async function main() {
     DEMO_MODE: demo ? "true" : "false",
     APP_URL: origin,
     REDIS_URL: "",
-    NODE_ENV: "development",
+    NODE_ENV: "production",
     NEXT_TELEMETRY_DISABLED: "1",
   };
   // Reuse securely injected API credentials when the private local setting is blank.
@@ -181,6 +183,18 @@ async function main() {
     "CANVA_CLIENT_SECRET",
   ])
     if (!desktop[name] && process.env[name]) env[name] = process.env[name];
+  const cli = path.join(root, "node_modules/next/dist/bin/next");
+  const buildMarker = path.join(runtime, "application.sha256");
+  const expectedBuild = applicationHash(root);
+  if (
+    !existsSync(path.join(root, ".next/BUILD_ID")) ||
+    !existsSync(buildMarker) ||
+    readFileSync(buildMarker, "utf8").trim() !== expectedBuild
+  ) {
+    rmSync(buildMarker, { force: true });
+    await setupStep("[4/4] 실제 운영 앱 빌드", [cli, "build"], 300000, env);
+    writeFileSync(buildMarker, applicationHash(root), { mode: 0o600 });
+  } else console.log("[4/4] 검증된 운영 빌드를 재사용합니다.");
   if (!demo) {
     worker = spawn(
       process.execPath,
@@ -191,10 +205,9 @@ async function main() {
       console.error("로컬 작업 처리기를 시작하지 못했습니다."),
     );
   }
-  const cli = path.join(root, "node_modules/next/dist/bin/next");
   server = spawn(
     process.execPath,
-    [cli, "dev", "--hostname", "127.0.0.1", "--port", String(port)],
+    [cli, "start", "--hostname", "127.0.0.1", "--port", String(port)],
     {
       cwd: root,
       env,

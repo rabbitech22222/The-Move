@@ -2,21 +2,21 @@
 
 작업 공간 API에는 POST /api/auth가 발급하는 서명된 세션 쿠키가 필요합니다. 변경에는 application/json과 APP_URL에 일치하는 Origin이 필요합니다. 성공 응답은 `{data}`, 실패는 한국어 `{error,code}`입니다. 기술 식별자·필드 이름·저장한 상태 값은 영문 계약을 유지합니다. 값의 설명은 화면에서 한국어로 표시합니다.
 
-| 경로                           | 메서드              | 작업                                                                           |
-| ------------------------------ | ------------------- | ------------------------------------------------------------------------------ |
-| /api/health                    | GET                 | 앱 건강 상태·데모 여부. 외부 API 준비를 보증하지 않음                          |
-| /api/auth                      | POST / GET / DELETE | 로그인·현재 운영자·로그아웃                                                    |
-| /api/workspace                 | GET                 | 비밀 인증 값을 제외한 작업 공간                                                |
-| /api/projects                  | POST                | create, update, transition, approve, track-time                                |
-| /api/assets                    | POST                | add(projectId/kind/url/credit/선택 크기), approve/remove(assetId)              |
-| /api/intelligence              | POST                | add-source, ingest, refresh-news, save, dismiss, research, create-project      |
-| /api/canva                     | POST                | inspect, configure, generate, refresh, register-manual, export, refresh-export |
-| /api/jobs                      | POST                | 지원하는 kind와 대상 ID. 게시 우회 요청은 받지 않음                            |
-| /api/analytics                 | POST                | recommend, approve, reject, record-experiment                                  |
-| /api/settings                  | GET / POST          | 실제 인증·지표·처리기 상태·관리자의 규칙 관리 및 @themovemag\_ 확인·연결       |
-| /api/publications              | POST                | approve, schedule, cancel                                                      |
-| /api/oauth/canva 또는 meta     | GET                 | 관리자 OAuth 시작                                                              |
-| /api/oauth/{provider}/callback | GET                 | 사용자 세션·state 확인 후 코드 교환·암호화 저장                                |
+| 경로                           | 메서드              | 작업                                                                                                        |
+| ------------------------------ | ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| /api/health                    | GET                 | 앱 건강 상태·데모 여부. 외부 API 준비를 보증하지 않음                                                       |
+| /api/auth                      | POST / GET / DELETE | 로그인·현재 운영자·로그아웃                                                                                 |
+| /api/workspace                 | GET                 | 비밀 인증 값을 제외한 작업 공간                                                                             |
+| /api/projects                  | POST                | create, update, transition, approve, track-time                                                             |
+| /api/assets                    | POST                | add(projectId/kind/url/credit/선택 크기), approve/remove(assetId)                                           |
+| /api/intelligence              | POST                | add-source, ingest, refresh-news, save, dismiss, research, create-project                                   |
+| /api/canva                     | POST                | inspect, configure, generate, refresh, register-manual, export, refresh-export, upload-asset, refresh-asset |
+| /api/jobs                      | POST                | 지원하는 kind와 대상 ID. 게시 우회 요청은 받지 않음                                                         |
+| /api/analytics                 | POST                | recommend, approve, reject, record-experiment                                                               |
+| /api/settings                  | GET / POST          | 실제 인증·지표·처리기 상태·관리자의 규칙 관리 및 @themovemag\_ 확인·연결                                    |
+| /api/publications              | POST                | approve, schedule, cancel                                                                                   |
+| /api/oauth/canva 또는 meta     | GET                 | 관리자 OAuth 시작                                                                                           |
+| /api/oauth/{provider}/callback | GET                 | 사용자 세션·state 확인 후 코드 교환·암호화 저장                                                             |
 
 Canva generate에는 projectId, templateId와 선택적 pageCount, fields를 전달합니다. fields의 키는 실제 검사한 데이터셋 이름입니다. 문구는 `{type:"text",text:"..."}`, 미디어는 `{type:"image" 또는 "video",asset_id:"인증된 실제 자료 ID"}`입니다. 공개 URL을 Canva 자료 ID로 간주하지 않습니다. 원본 디자인을 수정하는 요청은 사용하지 않습니다.
 
@@ -29,3 +29,7 @@ connect-meta-account는 channelId=the-move와 선택적 accountId 및 accessToke
 작업 접수는 완료가 아닙니다. 오피스의 tasks/events, 디자인 요청과 게시 상태에서 실제 결과를 확인합니다. `null` 지표는 확인되지 않은 값이며 0으로 대체하지 않습니다. 외부 API가 실제 게시물 ID를 반환해야 게시 완료가 됩니다. 불명확한 응답은 자동 재전송하지 않습니다.
 
 research/create-project는 저장된 실제 제목·원문·발행 및 수집 날짜·불확실성으로 조사 준비서를 생성합니다. 사실 확인 완료나 완성 원고로 표시하지 않습니다. OpenAI가 없으면 수동 조사 준비서만 저장합니다. refresh-news는 모든 활성 출처 수집을 요청하며 일부 실패는 다른 출처 수집을 막지 않습니다.
+
+configure-oauth는 관리자만 실행하며 provider=meta/canva, clientId, clientSecret을 받아 암호화합니다. GET 응답에는 비밀 키가 없으며 oauthReady 및 콜백 주소만 반환합니다. connect-canva는 선택적 accessToken으로 지정 원본 접근을 검증한 뒤 필드를 검사합니다. 일부 필드 실패는 원본별 setup 상태에 기록합니다.
+
+upload-asset/refresh-asset은 assetId를 받고 해당 프로젝트의 승인된 미디어만 처리합니다. 실제 작업 ID가 있으면 CANVA_RESULT 작업을 등록해 완료까지 확인합니다. CANVA_GENERATE의 접수 완료와 CANVA_RESULT의 실제 제작 완료는 별도입니다. 새 디자인 ID와 편집 URL의 디자인 ID가 일치해야 READY로 기록합니다.

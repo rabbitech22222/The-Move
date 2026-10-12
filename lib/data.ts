@@ -329,6 +329,9 @@ async function readDatabase(tx: Transaction): Promise<WorkspaceData> {
       updatedAt: iso(row.updatedAt),
     })),
     assets: assets.map((row) => ({
+      canvaUploadJobId: row.canvaUploadJobId,
+      canvaAssetId: row.canvaAssetId,
+      canvaUploadError: row.canvaUploadError,
       id: row.id,
       projectId: row.projectId,
       kind: row.kind,

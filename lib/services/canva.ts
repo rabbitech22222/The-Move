@@ -196,6 +196,12 @@ export async function inspectCanvaTemplate(
         page_count?: number;
       };
     }>(`${CANVA}/designs/${encodeURIComponent(template.designId)}`, { token });
+    if (source.design?.id !== template.designId)
+      throw new ServiceError(
+        "INVALID_API_RESPONSE",
+        "Canva 원본 ID가 일치하지 않습니다. 다른 디자인의 미리보기는 저장하지 않습니다.",
+        502,
+      );
     await mutateWorkspace(
       actorId,
       "CANVA_REFERENCE_READ",
@@ -237,6 +243,7 @@ export async function inspectCanvaTemplate(
           ),
           previewUrl: source.design.thumbnail?.url,
           sourceTitle: source.design.title,
+          inspectionError: undefined,
           ...(inspectedBinding.pageCount
             ? { pageCount: inspectedBinding.pageCount }
             : {}),
@@ -254,6 +261,10 @@ export async function inspectCanvaTemplate(
       (draft) => {
         const target = draft.templates.find((t) => t.id === templateId)!;
         target.status = "SETUP_REQUIRED";
+        target.configuration = {
+          ...target.configuration,
+          inspectionError: errorMessage(error),
+        };
       },
     );
     throw error;
@@ -481,7 +492,8 @@ export async function refreshCanvaDesign(
           !externalId ||
           referenceDesigns.has(externalId) ||
           !editUrl ||
-          !/^https:\/\/(www\.)?canva\.com\//.test(editUrl)
+          !/^https:\/\/(www\.)?canva\.com\//.test(editUrl) ||
+          validateManualDesignLink(editUrl).designId !== externalId
         ) {
           throw new ServiceError(
             "INVALID_API_RESPONSE",

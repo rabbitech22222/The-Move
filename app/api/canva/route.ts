@@ -9,6 +9,7 @@ import {
   exportCanvaDesign,
 } from "@/lib/services/canva";
 import { enqueueTask } from "@/lib/jobs";
+import { uploadCanvaAsset } from "@/lib/services/canva-assets";
 const schema = z.object({
   action: z.enum([
     "inspect",
@@ -18,8 +19,11 @@ const schema = z.object({
     "configure",
     "export",
     "refresh-export",
+    "upload-asset",
+    "refresh-asset",
   ]),
   templateId: z.string().optional(),
+  assetId: z.string().optional(),
   brandTemplateId: z
     .string()
     .regex(/^[A-Za-z0-9_-]{1,200}$/)
@@ -46,7 +50,33 @@ export async function POST(request: Request) {
   return endpoint(async () => {
     const user = await authorize(request, true),
       input = await body(request, schema);
-    if (input.action === "configure") {
+    if (input.action === "upload-asset" || input.action === "refresh-asset") {
+      if (!input.assetId)
+        throw new HttpError(
+          400,
+          "ASSET_REQUIRED",
+          "승인한 프로젝트 미디어를 선택하세요.",
+        );
+      const asset = await uploadCanvaAsset(
+        input.assetId,
+        user.id,
+        input.action === "refresh-asset",
+      );
+      if (
+        asset.canvaUploadJobId &&
+        asset.canvaUploadJobId !== "pending" &&
+        !asset.canvaAssetId &&
+        !asset.canvaUploadError
+      )
+        await enqueueTask(
+          "CANVA_RESULT",
+          {
+            assetId: asset.id,
+            idempotencyKey: `canva-asset-${asset.canvaUploadJobId}`,
+          },
+          user.id,
+        );
+    } else if (input.action === "configure") {
       if (user.role !== "ADMIN")
         throw new HttpError(
           403,

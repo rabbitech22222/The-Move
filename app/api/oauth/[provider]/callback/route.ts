@@ -2,11 +2,13 @@ import { providerFetch } from "@/lib/integrations/transport";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { authorize, endpoint, HttpError } from "@/lib/http";
-import { oauthProvider, oauthConfig, verifyOAuthState } from "@/lib/oauth";
+import { oauthProvider, verifyOAuthState } from "@/lib/oauth";
+import { resolvedOAuthConfig } from "@/lib/integration-config";
 import { saveIntegrationToken } from "@/lib/credentials";
 import { getWorkspaceData, mutateWorkspace } from "@/lib/data";
 import { connectTheMoveAccount } from "@/lib/integrations/the-move-account";
 import { enqueueTask } from "@/lib/jobs";
+import { connectCanvaAccount } from "@/lib/integrations/canva-account";
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ provider: string }> },
@@ -25,7 +27,7 @@ export async function GET(
       url.searchParams.get("state"),
       user.id,
     );
-    const config = oauthConfig(provider);
+    const config = await resolvedOAuthConfig(provider);
     const code = url.searchParams.get("code");
     if (!code)
       throw new HttpError(
@@ -92,8 +94,8 @@ export async function GET(
       );
       await enqueueTask("METRICS_SYNC", { channelId: "the-move" }, user.id);
     } else
-      await saveIntegrationToken(
-        provider,
+      await connectCanvaAccount(
+        user.id,
         token.access_token,
         token.refresh_token,
         token.expires_in,

@@ -108,6 +108,7 @@ export interface CanvaTemplate {
     fieldTypes?: Record<string, string>;
     previewUrl?: string;
     sourceTitle?: string;
+    inspectionError?: string;
   };
   inspectedAt: string | null;
   fields: string[];
@@ -222,6 +223,9 @@ export interface Recommendation {
   experimentResult: string | null;
 }
 export interface Asset {
+  canvaUploadJobId?: string | null;
+  canvaAssetId?: string | null;
+  canvaUploadError?: string | null;
   id: string;
   projectId: string;
   kind: "IMAGE" | "VIDEO";

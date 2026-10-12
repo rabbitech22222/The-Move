@@ -11,6 +11,7 @@ import { verifyPassword } from "../lib/auth";
 import { enqueueTask } from "../lib/jobs";
 import { runLocalJobOnce } from "../lib/local-worker";
 import { saveIntegrationToken, getIntegrationToken } from "../lib/credentials";
+import { saveOAuthClient, getOAuthClient } from "../lib/integration-config";
 let directory: string;
 beforeEach(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), "move-real-local-"));
@@ -27,6 +28,25 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 describe("real local operation without Docker or Redis", () => {
+  it("encrypts OAuth application secrets, preserves them across reads and does not expose them in workspace data", async () => {
+    vi.stubEnv("CANVA_CLIENT_ID", "");
+    vi.stubEnv("CANVA_CLIENT_SECRET", "");
+    await getWorkspaceData();
+    await saveOAuthClient("canva", {
+      clientId: "fixture-public-client-id",
+      secret: "fixture-client-secret",
+    });
+    expect(await getOAuthClient("canva")).toEqual({
+      clientId: "fixture-public-client-id",
+      secret: "fixture-client-secret",
+    });
+    expect(
+      await readFile(path.join(directory, "oauth-apps.json"), "utf8"),
+    ).not.toContain("fixture-client-secret");
+    expect(JSON.stringify(await getWorkspaceData())).not.toContain(
+      "fixture-client-secret",
+    );
+  });
   it("starts a single account with no example metrics, hashes distinct operator credentials and preserves them", async () => {
     const data = await getWorkspaceData();
     expect(data.demo).toBe(false);

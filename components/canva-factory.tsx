@@ -1,7 +1,9 @@
 "use client";
 import { koreanLabel } from "@/lib/korean";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { ProductionSteps } from "./production-steps";
+import { ProjectAssets } from "./project-assets";
 import { CanvaTemplateSetup } from "@/components/canva-template-setup";
 import { ManualCanvaCopy } from "@/components/manual-canva-copy";
 import {
@@ -34,6 +36,7 @@ function stateLabel(status: string) {
 export function CanvaFactory() {
   const { data, loading, mutate, refresh } = useWorkspace();
   const [projectId, setProjectId] = useState("");
+  const [canvaConfigured, setCanvaConfigured] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [videoFields, setVideoFields] = useState<Record<string, boolean>>({});
@@ -42,6 +45,26 @@ export function CanvaFactory() {
     text: string;
     failed: boolean;
   } | null>(null);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get(
+      "project",
+    );
+    const current = data?.projects.find((p) => p.id === requested);
+    if (current && data) {
+      setProjectId(current.id);
+      setTemplateId(
+        data.templates.find(
+          (t) =>
+            t.channelId === current.channelId &&
+            t.format === current.format &&
+            (!t.operatorId || t.operatorId === current.operatorId),
+        )?.id || "",
+      );
+      const url = new URL(window.location.href);
+      url.searchParams.delete("project");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [data]);
   const project = data?.projects.find((p) => p.id === projectId);
   const template = data?.templates.find((t) => t.id === templateId);
   const eligible = (t: CanvaTemplate) =>
@@ -158,6 +181,7 @@ export function CanvaFactory() {
           </a>
         </Button>
       </header>
+      <ProductionSteps onCanvaConfigured={setCanvaConfigured} />
       {notice && (
         <div
           role={notice.failed ? "alert" : "status"}
@@ -359,6 +383,17 @@ export function CanvaFactory() {
             )}
             <div className="grid gap-3 sm:grid-cols-2">
               <Readiness
+                ready={
+                  !!project && ["DESIGN", "REVIEW"].includes(project.stage)
+                }
+                title="편집 단계"
+                detail={
+                  project && ["DESIGN", "REVIEW"].includes(project.stage)
+                    ? "디자인 제작 단계입니다"
+                    : "초안과 출처를 검토하고 스튜디오에서 디자인 단계로 이동하세요"
+                }
+              />
+              <Readiness
                 ready={researchReady}
                 title="조사 출처"
                 detail={
@@ -393,7 +428,8 @@ export function CanvaFactory() {
             {template && template.status !== "READY" && (
               <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
                 자동 채우기 필드를 아직 확인하지 못했습니다. 먼저 검사하세요.
-                필드나 API 권한이 없으면 필요한 설정을 안내합니다.
+                필드나 API 권한이 없으면 필요한 설정을 안내합니다.{" "}
+                {template.configuration?.inspectionError}
               </div>
             )}
             {template?.fields.length ? (
@@ -416,6 +452,50 @@ export function CanvaFactory() {
                         ? "Canva 미디어 자료 ID"
                         : "문구"}
                     </span>
+                    {["image", "video"].includes(
+                      template.configuration?.fieldTypes?.[name] || "",
+                    ) && (
+                      <select
+                        className="select mt-2"
+                        aria-label={`${name} 업로드된 프로젝트 자료`}
+                        value=""
+                        onChange={(e) => {
+                          const asset = data.assets.find(
+                            (a) => a.id === e.target.value,
+                          );
+                          if (asset?.canvaAssetId) {
+                            setFieldValues((v) => ({
+                              ...v,
+                              [name]: asset.canvaAssetId!,
+                            }));
+                            setVideoFields((v) => ({
+                              ...v,
+                              [name]: asset.kind === "VIDEO",
+                            }));
+                          }
+                        }}
+                      >
+                        <option value="">업로드 완료한 승인 자료 선택…</option>
+                        {data.assets
+                          .filter(
+                            (a) =>
+                              a.projectId === projectId &&
+                              a.approved &&
+                              a.canvaAssetId &&
+                              (template.configuration?.fieldTypes?.[name] ===
+                              "video"
+                                ? a.kind === "VIDEO"
+                                : a.kind === "IMAGE" ||
+                                  project?.format === "REEL"),
+                          )
+                          .map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.kind === "VIDEO" ? "영상" : "이미지"} ·{" "}
+                              {a.credit.slice(0, 70)}
+                            </option>
+                          ))}
+                      </select>
+                    )}
                     {project?.format === "REEL" &&
                       template.configuration?.fieldTypes?.[name] ===
                         "image" && (
@@ -450,6 +530,7 @@ export function CanvaFactory() {
                 ))}
               </div>
             ) : null}
+            {project && <ProjectAssets project={project} />}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-5">
               <p className="max-w-sm text-xs leading-relaxed muted">
                 Canva에서는 초안을 생성합니다. Instagram 게시에는 별도의 사람
@@ -457,7 +538,14 @@ export function CanvaFactory() {
               </p>
               <Button
                 disabled={
-                  !!busy || !researchReady || !copyReady || !selectionReady
+                  !!busy ||
+                  !canvaConfigured ||
+                  !researchReady ||
+                  !copyReady ||
+                  !selectionReady ||
+                  template?.status !== "READY" ||
+                  !project ||
+                  !["DESIGN", "REVIEW"].includes(project.stage)
                 }
                 onClick={generate}
               >
@@ -639,7 +727,11 @@ export function CanvaFactory() {
                             ))}
                             <a
                               className="block text-xs text-[var(--accent)] mt-2"
-                              href="/studio"
+                              href={
+                                project
+                                  ? `/studio?project=${encodeURIComponent(project.id)}`
+                                  : "/studio"
+                              }
                             >
                               스튜디오에서 파일 검토·승인·게시 →
                             </a>

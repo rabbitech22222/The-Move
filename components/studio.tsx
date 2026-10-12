@@ -109,6 +109,26 @@ export function Studio() {
     caption: string;
   } | null>(null);
   useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get(
+      "project",
+    );
+    const current = data?.projects.find((p) => p.id === requested);
+    if (current && data) {
+      setSelectedId(current.id);
+      setForm(fromProject(current));
+      setCaption(current.draftCopy);
+      setOpen(true);
+      setApprovedPayload(null);
+      setMediaUrl(
+        data.designs
+          .filter((d) => d.projectId === current.id && d.exportUrls?.length)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+          ?.exportUrls?.join("\n") || "",
+      );
+      const url = new URL(window.location.href);
+      url.searchParams.delete("project");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
     if (
       data &&
       new URLSearchParams(window.location.search).get("new") === "1"
@@ -784,7 +804,9 @@ export function Studio() {
                 )}
                 {["DESIGN", "REVIEW", "APPROVED"].includes(selected.stage) && (
                   <Button variant="outline" size="sm" asChild>
-                    <Link href="/canva">
+                    <Link
+                      href={`/canva?project=${encodeURIComponent(selected.id)}`}
+                    >
                       <Layers2 size={13} />
                       캔바 제작소 열기
                     </Link>

@@ -1,9 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { prepareDesktop } from "../scripts/prepare-desktop.mjs";
+import { applicationHash } from "../scripts/application-hash.mjs";
 describe("default real desktop configuration", () => {
+  it("rebuilds when application sources change and excludes private state and generated type files from the cache key", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "move-build-cache-"));
+    try {
+      await mkdir(path.join(root, "app"));
+      await writeFile(
+        path.join(root, "app/page.tsx"),
+        "export default function Page(){return null}",
+      );
+      const initial = applicationHash(root);
+      await writeFile(
+        path.join(root, ".env.desktop"),
+        "TOKEN_ENCRYPTION_KEY=fixture-private-value",
+      );
+      await writeFile(path.join(root, "next-env.d.ts"), "generated file");
+      expect(applicationHash(root)).toBe(initial);
+      await writeFile(
+        path.join(root, "app/page.tsx"),
+        "export default function Page(){return <main>changed</main>}",
+      );
+      expect(applicationHash(root)).not.toBe(initial);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   it("creates private real-operation settings in a spaced path and preserves subsequent edits", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "THE MOVE desktop "));
     try {

@@ -118,18 +118,17 @@ export async function getIntegrationToken(
       record.expiresAt &&
       new Date(record.expiresAt).getTime() <= Date.now() + 30_000
     ) {
-      if (
-        provider === "canva" &&
-        record.encryptedRefreshToken &&
-        process.env.CANVA_CLIENT_ID &&
-        process.env.CANVA_CLIENT_SECRET
-      ) {
+      const client =
+        provider === "canva" && record.encryptedRefreshToken
+          ? await (await import("./integration-config")).getOAuthClient("canva")
+          : null;
+      if (provider === "canva" && record.encryptedRefreshToken && client) {
         const r = await providerFetch(
           "https://api.canva.com/rest/v1/oauth/token",
           {
             method: "POST",
             headers: {
-              Authorization: `Basic ${Buffer.from(`${process.env.CANVA_CLIENT_ID}:${process.env.CANVA_CLIENT_SECRET}`).toString("base64")}`,
+              Authorization: `Basic ${Buffer.from(`${client.clientId}:${client.secret}`).toString("base64")}`,
               "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({

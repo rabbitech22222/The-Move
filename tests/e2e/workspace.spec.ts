@@ -8,7 +8,7 @@ import { mkdir } from "node:fs/promises";
 import { koreanLabel } from "../../lib/korean";
 import type { WorkspaceData, Project } from "../../lib/domain";
 
-const origin = "http://localhost:3000";
+const origin = process.env.MOVE_E2E_ORIGIN || "http://localhost:3111";
 const source = "https://www.bbc.com/news";
 
 async function login(page: Page, operator = 1) {

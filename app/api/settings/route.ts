@@ -6,6 +6,8 @@ import { credentialStatus } from "@/lib/credentials";
 import { isLocalOperation } from "@/lib/runtime";
 import { localWorkerStatus } from "@/lib/local-worker";
 import { enqueueTask } from "@/lib/jobs";
+import { getOAuthClient, saveOAuthClient } from "@/lib/integration-config";
+import { connectCanvaAccount } from "@/lib/integrations/canva-account";
 export async function GET() {
   return endpoint(async () => {
     const user = await authorize();
@@ -16,12 +18,15 @@ export async function GET() {
       .sort((a, b) => b.syncedAt.localeCompare(a.syncedAt))[0];
     const latestSync = data.tasks.find((t) => t.kind === "METRICS_SYNC");
     const local = isLocalOperation() ? await localWorkerStatus() : null;
-    const [canva, meta] = await Promise.all([
+    const [canva, meta, canvaClient, metaClient] = await Promise.all([
       credentialStatus("canva"),
       credentialStatus("meta"),
+      getOAuthClient("canva"),
+      getOAuthClient("meta"),
     ]);
     const state = (configured: boolean, details: string, expired = false) => ({
       configured,
+      expired,
       status: expired
         ? "인증 만료"
         : configured
@@ -51,6 +56,20 @@ export async function GET() {
           : [],
       },
       canManageIntegrations: user.role === "ADMIN",
+      canva: {
+        references: data.templates.map((t) => ({
+          id: t.id,
+          designId: t.designId,
+          name: t.name,
+          status: t.status,
+          inspectedAt: t.inspectedAt,
+          fields: t.fields,
+          message: t.configuration?.inspectionError || null,
+        })),
+        lastConnection:
+          data.audit.find((a) => a.action === "CANVA_CONNECTION_RESULT")
+            ?.details || null,
+      },
       operators: data.operators,
       integrations: {
         openai: state(
@@ -64,11 +83,11 @@ export async function GET() {
             canva.expired,
           ),
           oauthReady: !!(
-            process.env.CANVA_CLIENT_ID &&
-            process.env.CANVA_CLIENT_SECRET &&
+            canvaClient &&
             process.env.APP_URL &&
             process.env.TOKEN_ENCRYPTION_KEY
           ),
+          callbackUrl: `${process.env.APP_URL}/api/oauth/canva/callback`,
         },
         meta: {
           ...state(
@@ -77,11 +96,11 @@ export async function GET() {
             meta.expired,
           ),
           oauthReady: !!(
-            process.env.META_APP_ID &&
-            process.env.META_APP_SECRET &&
+            metaClient &&
             process.env.APP_URL &&
             process.env.TOKEN_ENCRYPTION_KEY
           ),
+          callbackUrl: `${process.env.APP_URL}/api/oauth/meta/callback`,
         },
         redis: state(
           local ? local.running : !!process.env.REDIS_URL,
@@ -101,6 +120,16 @@ export async function POST(request: Request) {
     const input = await body(
       request,
       z.discriminatedUnion("action", [
+        z.object({
+          action: z.literal("configure-oauth"),
+          provider: z.enum(["meta", "canva"]),
+          clientId: z.string().trim().min(1).max(200),
+          clientSecret: z.string().trim().min(8).max(4096),
+        }),
+        z.object({
+          action: z.literal("connect-canva"),
+          accessToken: z.string().trim().min(20).max(8192).optional(),
+        }),
         z.object({
           action: z.literal("create-channel"),
           name: z.string().trim().min(1).max(100),
@@ -126,6 +155,45 @@ export async function POST(request: Request) {
         "FORBIDDEN",
         "Only an admin can change editorial rules and account mappings.",
       );
+    if (
+      input.action === "configure-oauth" ||
+      (input.action === "connect-meta-account" && input.accessToken) ||
+      (input.action === "connect-canva" && input.accessToken)
+    ) {
+      const origin = new URL(process.env.APP_URL || request.url);
+      if (
+        origin.protocol !== "https:" &&
+        !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)
+      )
+        throw new HttpError(
+          409,
+          "HTTPS_REQUIRED",
+          "인증 정보 입력에는 HTTPS 또는 내 컴퓨터의 localhost 실행이 필요합니다.",
+        );
+    }
+    if (input.action === "configure-oauth") {
+      if ((await getWorkspaceData()).demo)
+        throw new HttpError(
+          409,
+          "DEMO_PUBLISH_DISABLED",
+          "실제 운영 공간에서 계정 로그인을 설정하세요.",
+        );
+      await saveOAuthClient(input.provider, {
+        clientId: input.clientId,
+        secret: input.clientSecret,
+      });
+      await mutateWorkspace(
+        user.id,
+        "OAUTH_APP_CONFIGURED",
+        input.provider,
+        () => {},
+      );
+      return ok(await getWorkspaceData());
+    }
+    if (input.action === "connect-canva") {
+      await connectCanvaAccount(user.id, input.accessToken);
+      return ok(await getWorkspaceData());
+    }
     if (input.action === "connect-meta-account") {
       if (input.channelId !== "the-move")
         throw new HttpError(
